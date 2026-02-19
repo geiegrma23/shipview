@@ -126,6 +126,60 @@ app.get('/api/orders',async (req, res) => {
   }
 });
 
+// Aggregated orders for map view — groups by customer + state + ZIP3
+// Returns ~1000x fewer rows than raw orders
+app.get('/api/orders/aggregated', async (req, res) => {
+  try {
+    const conditions = [];
+    const params = [];
+
+    if (req.query.from_date) {
+      conditions.push('`Ship Date` >= ?');
+      params.push(req.query.from_date);
+    }
+    if (req.query.to_date) {
+      conditions.push('`Ship Date` <= ?');
+      params.push(req.query.to_date);
+    }
+    if (req.query.status) {
+      conditions.push('`Order_Status` = ?');
+      params.push(req.query.status);
+    }
+    if (req.query.business_unit) {
+      conditions.push('`Business Unit` = ?');
+      params.push(req.query.business_unit);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const query = `
+      SELECT
+        \`Cust Name\` AS cust_name,
+        \`Ship To State\` AS ship_to_state,
+        LEFT(\`Ship To Zip\`, 3) AS zip3,
+        COUNT(*) AS count
+      FROM \`Order_Query\`
+      ${whereClause}
+      GROUP BY \`Cust Name\`, \`Ship To State\`, zip3
+    `;
+
+    const [rows] = await pool.query(query, params);
+
+    // Also get total raw count
+    const countQuery = `SELECT COUNT(*) as total FROM \`Order_Query\` ${whereClause}`;
+    const [countResult] = await pool.query(countQuery, params);
+
+    res.json({
+      data: rows,
+      total: countResult[0].total,
+      aggregated_rows: rows.length
+    });
+  } catch (err) {
+    console.error('Aggregation query error:', err);
+    res.status(500).json({ error: 'Database query failed', message: err.message });
+  }
+});
+
 // Get distinct values for filters
 app.get('/api/filters',async (req, res) => {
   try {

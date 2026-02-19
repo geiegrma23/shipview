@@ -1629,10 +1629,10 @@ async function previewRecordCount() {
 
   countEl.textContent = 'Counting...';
   try {
-    const res = await fetch(`${API_BASE}/api/orders?limit=1&from_date=${from}&to_date=${to}`);
+    const res = await fetch(`${API_BASE}/api/orders/aggregated?from_date=${from}&to_date=${to}`);
     if (!res.ok) throw new Error('API error');
     const json = await res.json();
-    countEl.textContent = `${json.total.toLocaleString()} records in range`;
+    countEl.textContent = `${json.total.toLocaleString()} orders (${json.aggregated_rows.toLocaleString()} groups)`;
   } catch {
     countEl.textContent = '';
   }
@@ -1646,46 +1646,32 @@ async function loadFromDatabase() {
 
   btn.disabled = true;
   btn.textContent = 'Loading...';
-  status.textContent = 'Connecting to database...';
-  showLoading(10);
+  status.textContent = 'Fetching aggregated data...';
+  showLoading(20);
 
   try {
-    let allRows = [];
-    let offset = 0;
-    const limit = 10000;
-    let total = Infinity;
-
     const dateParams = (fromDate ? `&from_date=${fromDate}` : '') + (toDate ? `&to_date=${toDate}` : '');
 
-    while (offset < total) {
-      status.textContent = `Fetching records ${offset.toLocaleString()} of ${total === Infinity ? '...' : total.toLocaleString()}`;
-      showLoading(10 + (offset / Math.max(total, 1)) * 30);
+    const res = await fetch(`${API_BASE}/api/orders/aggregated?x=1${dateParams}`);
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
 
-      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}${dateParams}`);
-      if (!res.ok) throw new Error(`API returned ${res.status}`);
+    const json = await res.json();
+    status.textContent = `Processing ${json.total.toLocaleString()} orders (${json.aggregated_rows.toLocaleString()} groups)...`;
+    showLoading(50);
 
-      const json = await res.json();
-      total = json.total;
-      allRows = allRows.concat(json.data);
-      offset += limit;
-
-      if (json.data.length === 0) break;
+    // Expand aggregated rows: each row has a count, create that many entries
+    // so the existing processRows/customer counting logic works correctly
+    const rows = [];
+    for (const r of json.data) {
+      const row = {
+        'Cust Name': r.cust_name || '',
+        'Ship to State': r.ship_to_state || '',
+        'Ship to Zip': (r.zip3 || '') + '00'  // pad ZIP3 back to 5 digits for geocoding
+      };
+      for (let i = 0; i < r.count; i++) {
+        rows.push(row);
+      }
     }
-
-    status.textContent = `Processing ${allRows.length.toLocaleString()} records...`;
-    showLoading(40);
-
-    // Convert API response to the format processRows expects
-    const rows = allRows.map(r => ({
-      'Cust Name': r.cust_name || '',
-      'Ship to State': r.ship_to_state || '',
-      'Ship to Zip': r.ship_to_zip || '',
-      'Ship to City': r.ship_to_city || '',
-      'Ship Date': r.ship_date || '',
-      'Order Status': r.order_status || '',
-      'Carrier': r.carrier || '',
-      'Order Qty': r.order_qty || ''
-    }));
 
     processRows(rows);
   } catch (err) {
