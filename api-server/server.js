@@ -101,7 +101,7 @@ app.get('/api/orders',async (req, res) => {
         \`Order Qty\` AS order_qty,
         \`Business Unit\` AS business_unit,
         \`Order Sub Status\` AS order_sub_status
-      FROM \`Order Query\`
+      FROM \`Order_Query\`
       ${whereClause}
       ORDER BY \`Ship Date\` DESC
       LIMIT ? OFFSET ?
@@ -111,7 +111,7 @@ app.get('/api/orders',async (req, res) => {
     const [rows] = await pool.query(query, params);
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) as total FROM \`Order Query\` ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as total FROM \`Order_Query\` ${whereClause}`;
     const [countResult] = await pool.query(countQuery, params.slice(0, -2));
 
     res.json({
