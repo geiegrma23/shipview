@@ -445,6 +445,36 @@ body {
 .db-load-btn:hover { background: #16a34a; }
 .db-load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.db-date-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.db-date-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.db-date-row input[type="date"] {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.db-date-row input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+.db-record-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 8px;
+}
+
 /* Loading */
 .loading-bar {
   position: absolute;
@@ -1013,6 +1043,13 @@ body {
     <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.xlsx,.xls">
     <p class="formats">Supports: .csv, .tsv, .xlsx, .xls — up to several hundred thousand rows</p>
     <div class="upload-divider">or</div>
+    <div class="db-date-row">
+      <label>From</label>
+      <input type="date" id="dbDateFrom">
+      <label>To</label>
+      <input type="date" id="dbDateTo">
+    </div>
+    <div class="db-record-count" id="dbRecordCount"></div>
     <button class="db-load-btn" id="btnLoadDB">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
       Load from Database
@@ -1565,9 +1602,48 @@ Object.entries(US_REGIONS).forEach(([regionName, regionData]) => {
 // ── API Configuration ──
 const API_BASE = 'https://api.ksp3plhq.com';
 
+// Set default date range (last 30 days)
+function initDatePickers() {
+  const today = new Date();
+  const thirtyAgo = new Date(today);
+  thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+
+  const toStr = today.toISOString().split('T')[0];
+  const fromStr = thirtyAgo.toISOString().split('T')[0];
+
+  document.getElementById('dbDateTo').value = toStr;
+  document.getElementById('dbDateFrom').value = fromStr;
+
+  // Preview record count when dates change
+  document.getElementById('dbDateFrom').addEventListener('change', previewRecordCount);
+  document.getElementById('dbDateTo').addEventListener('change', previewRecordCount);
+  previewRecordCount();
+}
+
+async function previewRecordCount() {
+  const from = document.getElementById('dbDateFrom').value;
+  const to = document.getElementById('dbDateTo').value;
+  const countEl = document.getElementById('dbRecordCount');
+
+  if (!from || !to) { countEl.textContent = ''; return; }
+
+  countEl.textContent = 'Counting...';
+  try {
+    const res = await fetch(`${API_BASE}/api/orders?limit=1&from_date=${from}&to_date=${to}`);
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    countEl.textContent = `${json.total.toLocaleString()} records in range`;
+  } catch {
+    countEl.textContent = '';
+  }
+}
+
 async function loadFromDatabase() {
   const btn = document.getElementById('btnLoadDB');
   const status = document.getElementById('dbStatus');
+  const fromDate = document.getElementById('dbDateFrom').value;
+  const toDate = document.getElementById('dbDateTo').value;
+
   btn.disabled = true;
   btn.textContent = 'Loading...';
   status.textContent = 'Connecting to database...';
@@ -1579,11 +1655,13 @@ async function loadFromDatabase() {
     const limit = 10000;
     let total = Infinity;
 
+    const dateParams = (fromDate ? `&from_date=${fromDate}` : '') + (toDate ? `&to_date=${toDate}` : '');
+
     while (offset < total) {
-      status.textContent = `Fetching records ${offset.toLocaleString()}...`;
+      status.textContent = `Fetching records ${offset.toLocaleString()} of ${total === Infinity ? '...' : total.toLocaleString()}`;
       showLoading(10 + (offset / Math.max(total, 1)) * 30);
 
-      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}`);
+      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}${dateParams}`);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
 
       const json = await res.json();
@@ -2268,6 +2346,7 @@ function showLoading(pct) {
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   updatePrinters();
+  initDatePickers();
   // Show legend immediately for printer layer
   document.getElementById('mapLegend').style.display = 'block';
   updateLegend();
