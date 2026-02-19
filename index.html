@@ -1,0 +1,2296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShipView — Shipping Location Intelligence</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1a2236;
+  --bg-card: #151d2e;
+  --border: #243049;
+  --text-primary: #e8edf5;
+  --text-secondary: #8896b0;
+  --text-muted: #5a6a84;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.3);
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --cyan: #06b6d4;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 52px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 1000;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-logo svg { width: 22px; height: 22px; }
+.topbar-logo span {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+}
+.topbar-logo .sub {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-stats {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.stat-item .stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.stat-item .stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--border); }
+.btn.active { border-color: var(--accent); background: rgba(59,130,246,0.12); color: var(--accent); }
+.btn svg { width: 14px; height: 14px; }
+
+.btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-accent:hover { background: #2563eb; }
+
+/* Layout */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 280px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.2s;
+}
+.sidebar.collapsed { width: 0; overflow: hidden; border: none; }
+
+.sidebar-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.search-box {
+  position: relative;
+}
+.search-box input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-box input:focus { border-color: var(--accent); }
+.search-box input::placeholder { color: var(--text-muted); }
+.search-box svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.select-actions {
+  display: flex;
+  gap: 6px;
+}
+.select-actions button {
+  flex: 1;
+  padding: 5px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.select-actions button:hover { color: var(--text-primary); border-color: var(--accent); }
+
+.customer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+.customer-list::-webkit-scrollbar { width: 5px; }
+.customer-list::-webkit-scrollbar-track { background: transparent; }
+.customer-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.customer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+  user-select: none;
+}
+.customer-item:hover { background: var(--bg-tertiary); }
+
+.customer-item .checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.customer-item.selected .checkbox {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.customer-item.selected .checkbox::after {
+  content: '✓';
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.customer-item .cust-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.customer-item.selected .cust-name { color: var(--text-primary); }
+.customer-item .cust-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Map area */
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* Leaflet dark theme overrides */
+.leaflet-container { background: var(--bg-primary) !important; }
+.leaflet-control-zoom { border: 1px solid var(--border) !important; }
+.leaflet-control-zoom a {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+.leaflet-control-zoom a:hover { background: var(--bg-tertiary) !important; }
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+}
+.leaflet-popup-tip { background: var(--bg-card) !important; border: 1px solid var(--border) !important; }
+.leaflet-popup-content { margin: 10px 14px !important; font-family: 'DM Sans', sans-serif !important; font-size: 12px !important; }
+
+/* Map overlay controls */
+.map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 800;
+  display: flex;
+  gap: 6px;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 30px;
+  right: 12px;
+  z-index: 800;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 160px;
+}
+.map-legend h4 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.heatmap-gradient {
+  width: 100%;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+  margin-top: 6px;
+}
+.gradient-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+}
+.gradient-labels span {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* File drop area */
+.file-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 23, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.file-overlay.visible { opacity: 1; pointer-events: all; }
+
+.upload-card {
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 50px 60px;
+  text-align: center;
+  max-width: 520px;
+  transition: border-color 0.2s;
+}
+.upload-card.dragover { border-color: var(--accent); }
+.upload-card svg { width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 16px; }
+.upload-card h2 { font-size: 20px; margin-bottom: 8px; font-weight: 600; }
+.upload-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; }
+.upload-card .formats { font-size: 11px; color: var(--text-muted); }
+
+.file-input-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 12px;
+}
+.file-input-label:hover { background: #2563eb; }
+#fileInput { display: none; }
+
+/* Loading */
+.loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  z-index: 9999;
+  transition: width 0.3s;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Right panel */
+.right-panel {
+  width: 260px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.right-panel.collapsed { width: 0; overflow: hidden; border: none; }
+.right-panel::-webkit-scrollbar { width: 5px; }
+.right-panel::-webkit-scrollbar-track { background: transparent; }
+.right-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.panel-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section h3 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.view-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.view-option .toggle {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.view-option .toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all 0.2s;
+}
+.view-option .toggle.on { background: rgba(59,130,246,0.2); border-color: var(--accent); }
+.view-option .toggle.on::after { left: 16px; background: var(--accent); }
+
+.view-option span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.slider-group { margin-top: 8px; }
+.slider-group label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.slider-group label .val {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
+}
+.slider-group input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-tertiary);
+  outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg-secondary);
+}
+
+.cluster-info {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.cluster-info .ci-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.cluster-info .ci-row .ci-label { color: var(--text-muted); }
+.cluster-info .ci-row .ci-val {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+/* Custom cluster markers */
+.cluster-marker {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* State labels */
+.state-label {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.pin-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+}
+
+.printer-marker {
+  width: 16px;
+  height: 16px;
+  background: #f97316;
+  border: 2px solid #fff;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(249,115,22,0.6), 0 2px 6px rgba(0,0,0,0.4);
+}
+.printer-marker-inner {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+}
+
+/* Region View */
+.region-panel {
+  position: absolute;
+  bottom: 30px;
+  left: 12px;
+  z-index: 800;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 340px;
+  max-height: calc(100vh - 160px);
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.region-panel.visible { display: flex; }
+.region-panel-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.region-panel-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.region-panel-header h3 svg { width: 15px; height: 15px; color: var(--accent); }
+.region-panel-header .rp-total {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.region-panel-body {
+  overflow-y: auto;
+  padding: 6px 0;
+  flex: 1;
+}
+.region-panel-body::-webkit-scrollbar { width: 5px; }
+.region-panel-body::-webkit-scrollbar-track { background: transparent; }
+.region-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.region-card {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-left: 3px solid transparent;
+}
+.region-card:hover { background: var(--bg-tertiary); }
+.region-card.active { background: rgba(59,130,246,0.08); border-left-color: var(--accent); }
+
+.region-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.region-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.region-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.region-card-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.region-bar-track {
+  width: 100%;
+  height: 5px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.region-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.region-card-details {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.region-detail {
+  display: flex;
+  flex-direction: column;
+}
+.region-detail .rd-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.region-detail .rd-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Expanded region detail */
+.region-card-expanded {
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.region-card.active .region-card-expanded { display: block; }
+
+.region-state-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.region-state-row .rs-state { color: var(--text-secondary); min-width: 24px; }
+.region-state-row .rs-count {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: right;
+}
+.region-state-row .rs-bar {
+  flex: 1;
+  margin: 0 10px;
+  height: 3px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.region-state-row .rs-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.region-top-customers {
+  margin-top: 8px;
+}
+.region-top-customers h5 {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.rtc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 0;
+}
+.rtc-row .rtc-name {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.rtc-row .rtc-count {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* Region label on map */
+.region-map-label {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-align: center;
+  pointer-events: none !important;
+}
+.region-label-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.region-label-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+}
+.region-label-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+}
+.region-label-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span>ShipView<span class="sub">Shipping Intelligence</span></span>
+  </div>
+  <div class="topbar-stats" id="topbarStats">
+    <div class="stat-item"><span class="stat-val" id="statTotal">—</span><span class="stat-label">Locations</span></div>
+    <div class="stat-item"><span class="stat-val" id="statCustomers">—</span><span class="stat-label">Customers</span></div>
+    <div class="stat-item"><span class="stat-val" id="statStates">—</span><span class="stat-label">States</span></div>
+    <div class="stat-item"><span class="stat-val" id="statVisible">—</span><span class="stat-label">Visible</span></div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn" id="btnToggleSidebar" title="Toggle customer list">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M9 3v18"/></svg>
+    </button>
+    <button class="btn" id="btnToggleRight" title="Toggle settings panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-9.7-6.3l2.8-2.8m11.4-2.8l2.8-2.8M1 12h4m14 0h4M4.2 4.2l2.8 2.8m9.9 9.9l2.8 2.8"/></svg>
+    </button>
+    <button class="btn btn-accent" id="btnLoadFile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Load Data
+    </button>
+  </div>
+</div>
+
+<!-- Loading bar -->
+<div class="loading-bar" id="loadingBar" style="width:0%; display:none;"></div>
+
+<!-- Main -->
+<div class="main-layout">
+  <!-- Left sidebar: customers -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Customers</div>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="customerSearch" placeholder="Search customers...">
+      </div>
+      <div class="select-actions">
+        <button id="btnSelectAll">Select All</button>
+        <button id="btnDeselectAll">Deselect All</button>
+        <button id="btnInvert">Invert</button>
+      </div>
+    </div>
+    <div class="customer-list" id="customerList"></div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-container">
+    <div class="map-controls">
+      <button class="btn active" id="btnViewPins" data-view="pins">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Pins
+      </button>
+      <button class="btn active" id="btnViewHeat" data-view="heat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><path d="M12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6z"/><circle cx="12" cy="12" r="2"/></svg>
+        Heatmap
+      </button>
+      <button class="btn" id="btnViewCluster" data-view="cluster">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="7" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="19" cy="17" r="2"/></svg>
+        Clusters
+      </button>
+      <button class="btn" id="btnViewRegion" data-view="region">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16"/><path d="M16 6v16"/></svg>
+        Regions
+      </button>
+      <button class="btn active" id="btnViewPrinters" data-view="printers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="1"/><path d="M9 6h6"/><path d="M9 10h6"/><path d="M9 14h6"/></svg>
+        Printers
+      </button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="map-legend" id="mapLegend" style="display:none;">
+      <h4>Legend</h4>
+      <div id="legendContent"></div>
+    </div>
+
+    <!-- Region data panel -->
+    <div class="region-panel" id="regionPanel">
+      <div class="region-panel-header">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16"/><path d="M16 6v16"/></svg>
+          Regional Breakdown
+        </h3>
+        <span class="rp-total" id="regionTotalLabel">—</span>
+      </div>
+      <div class="region-panel-body" id="regionPanelBody"></div>
+    </div>
+  </div>
+
+  <!-- Right panel: settings -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-section">
+      <h3>View Layers</h3>
+      <div class="view-option" data-layer="pins">
+        <div class="toggle on" id="togglePins"></div>
+        <span>Pin Markers</span>
+      </div>
+      <div class="view-option" data-layer="heat">
+        <div class="toggle on" id="toggleHeat"></div>
+        <span>Heatmap Overlay</span>
+      </div>
+      <div class="view-option" data-layer="cluster">
+        <div class="toggle" id="toggleCluster"></div>
+        <span>Cluster View</span>
+      </div>
+      <div class="view-option" data-layer="region">
+        <div class="toggle" id="toggleRegion"></div>
+        <span>Region View</span>
+      </div>
+      <div class="view-option" data-layer="printers">
+        <div class="toggle on" id="togglePrinters"></div>
+        <span>Printer Locations</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Heatmap Settings</h3>
+      <div class="slider-group">
+        <label>Radius <span class="val" id="heatRadiusVal">25</span></label>
+        <input type="range" id="heatRadius" min="5" max="60" value="25">
+      </div>
+      <div class="slider-group">
+        <label>Intensity <span class="val" id="heatIntensityVal">0.6</span></label>
+        <input type="range" id="heatIntensity" min="1" max="20" value="6">
+      </div>
+      <div class="slider-group">
+        <label>Blur <span class="val" id="heatBlurVal">15</span></label>
+        <input type="range" id="heatBlur" min="5" max="40" value="15">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Pin Settings</h3>
+      <div class="slider-group">
+        <label>Pin Size <span class="val" id="pinSizeVal">6</span></label>
+        <input type="range" id="pinSize" min="2" max="16" value="6">
+      </div>
+      <div class="slider-group">
+        <label>Opacity <span class="val" id="pinOpacityVal">0.8</span></label>
+        <input type="range" id="pinOpacity" min="1" max="10" value="8">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Summary</h3>
+      <div class="cluster-info" id="summaryInfo">
+        <div class="ci-row"><span class="ci-label">No data loaded</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- File upload overlay -->
+<div class="file-overlay visible" id="fileOverlay">
+  <div class="upload-card" id="uploadCard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <h2>Load Shipping Data</h2>
+    <p>Upload a CSV, TSV, or Excel file with columns for<br><strong>Cust Name</strong>, <strong>Ship to State</strong>, and <strong>Ship to Zip</strong></p>
+    <label class="file-input-label" for="fileInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Choose File
+    </label>
+    <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.xlsx,.xls">
+    <p class="formats">Supports: .csv, .tsv, .xlsx, .xls — up to several hundred thousand rows</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+// ── ZIP → lat/lng lookup: precomputed centroids for US ZIP3 prefixes ──
+// This covers the first 3 digits of ZIP codes, mapping to approximate centroids.
+const ZIP3_COORDS = {
+  "006":[ 18.40,-66.06],"007":[ 18.22,-66.03],"008":[ 18.00,-66.61],"009":[ 18.20,-67.14],
+  "010":[ 42.12,-72.60],"011":[ 42.10,-72.59],"012":[ 42.45,-73.25],"013":[ 42.10,-72.04],
+  "014":[ 42.27,-71.87],"015":[ 42.23,-71.85],"016":[ 42.26,-71.80],"017":[ 42.35,-71.95],
+  "018":[ 42.38,-71.23],"019":[ 42.28,-71.05],"020":[ 42.34,-71.02],"021":[ 42.36,-71.06],
+  "022":[ 42.18,-71.02],"023":[ 42.05,-71.15],"024":[ 42.47,-71.15],"025":[ 42.08,-70.72],
+  "026":[ 41.73,-70.30],"027":[ 41.67,-71.45],"028":[ 41.82,-71.41],"029":[ 41.52,-71.31],
+  "030":[ 42.99,-71.46],"031":[ 42.76,-71.47],"032":[ 42.94,-72.28],"033":[ 43.21,-71.54],
+  "034":[ 43.63,-71.48],"035":[ 43.37,-72.34],"036":[ 43.64,-72.32],"037":[ 43.95,-71.69],
+  "038":[ 44.28,-71.17],"039":[ 43.08,-70.75],"040":[ 43.66,-70.26],"041":[ 43.49,-70.47],
+  "042":[ 43.91,-69.97],"043":[ 44.21,-69.78],"044":[ 44.80,-68.77],"045":[ 44.32,-69.78],
+  "046":[ 44.54,-69.63],"047":[ 46.68,-68.00],"048":[ 45.65,-69.22],"049":[ 43.34,-70.97],
+  "050":[ 44.26,-72.58],"051":[ 43.35,-72.52],"052":[ 43.61,-72.97],"053":[ 44.42,-72.02],
+  "054":[ 44.47,-72.69],"055":[ 42.36,-72.53],"056":[ 44.26,-72.58],"057":[ 43.61,-72.97],
+  "058":[ 44.42,-72.02],"059":[ 44.47,-72.69],
+  "060":[ 41.76,-72.68],"061":[ 41.76,-72.68],"062":[ 41.34,-72.93],"063":[ 41.17,-73.19],
+  "064":[ 41.28,-72.65],"065":[ 41.05,-73.54],"066":[ 41.19,-73.20],"067":[ 41.80,-73.12],
+  "068":[ 41.10,-73.42],"069":[ 41.10,-73.42],
+  "070":[ 40.73,-74.17],"071":[ 40.79,-74.23],"072":[ 40.90,-74.35],"073":[ 40.72,-74.31],
+  "074":[ 40.96,-74.13],"075":[ 40.87,-74.27],"076":[ 40.86,-74.76],"077":[ 40.35,-74.17],
+  "078":[ 40.63,-74.63],"079":[ 40.85,-74.82],
+  "080":[ 39.87,-74.97],"081":[ 39.69,-75.02],"082":[ 39.45,-75.04],"083":[ 39.37,-74.44],
+  "084":[ 39.40,-74.50],"085":[ 40.22,-74.76],"086":[ 40.21,-74.74],"087":[ 40.49,-74.45],
+  "088":[ 40.52,-74.36],"089":[ 40.61,-74.60],
+  "100":[ 40.71,-74.00],"101":[ 40.75,-73.99],"102":[ 40.71,-74.01],"103":[ 40.58,-74.15],
+  "104":[ 40.85,-73.87],"105":[ 40.91,-73.78],"106":[ 41.03,-73.76],"107":[ 41.09,-73.87],
+  "108":[ 40.94,-73.73],"109":[ 41.15,-73.99],
+  "110":[ 40.75,-73.80],"111":[ 40.69,-73.79],"112":[ 40.65,-73.95],"113":[ 40.71,-73.83],
+  "114":[ 40.66,-73.77],"115":[ 40.72,-73.72],"116":[ 40.74,-73.85],"117":[ 40.77,-73.53],
+  "118":[ 40.82,-73.22],"119":[ 40.90,-72.66],
+  "120":[ 42.65,-73.76],"121":[ 42.65,-73.76],"122":[ 42.65,-73.76],"123":[ 42.73,-73.69],
+  "124":[ 41.70,-73.93],"125":[ 41.50,-74.02],"126":[ 42.10,-74.00],"127":[ 41.74,-74.39],
+  "128":[ 42.45,-75.06],"129":[ 42.10,-75.91],
+  "130":[ 43.05,-76.15],"131":[ 43.05,-76.15],"132":[ 43.10,-75.23],"133":[ 42.10,-75.91],
+  "134":[ 43.23,-75.46],"135":[ 43.05,-76.15],"136":[ 44.70,-73.45],"137":[ 44.00,-75.50],
+  "138":[ 43.97,-75.91],"139":[ 42.44,-76.50],
+  "140":[ 42.89,-78.88],"141":[ 42.89,-78.88],"142":[ 42.77,-78.63],"143":[ 42.08,-79.24],
+  "144":[ 43.16,-77.61],"145":[ 43.16,-77.61],"146":[ 43.16,-77.61],"147":[ 42.44,-76.50],
+  "148":[ 42.70,-73.83],"149":[ 43.16,-77.61],
+  "150":[ 40.44,-79.98],"151":[ 40.44,-79.98],"152":[ 40.44,-79.98],"153":[ 40.30,-79.50],
+  "154":[ 40.05,-79.07],"155":[ 40.27,-76.88],"156":[ 40.50,-78.40],"157":[ 41.41,-79.78],
+  "158":[ 41.23,-77.00],"159":[ 40.35,-79.35],
+  "160":[ 41.45,-80.08],"161":[ 41.20,-79.38],"162":[ 41.95,-80.09],"163":[ 42.13,-80.09],
+  "164":[ 41.87,-79.14],"165":[ 41.00,-80.35],"166":[ 40.52,-78.40],"167":[ 40.67,-78.81],
+  "168":[ 40.48,-78.01],"169":[ 41.24,-76.00],
+  "170":[ 40.27,-76.88],"171":[ 40.27,-76.88],"172":[ 40.04,-76.31],"173":[ 39.96,-76.73],
+  "174":[ 40.25,-77.00],"175":[ 40.04,-76.31],"176":[ 40.04,-76.31],"177":[ 40.04,-76.31],
+  "178":[ 40.27,-76.88],"179":[ 40.58,-75.49],
+  "180":[ 40.62,-75.37],"181":[ 40.75,-75.31],"182":[ 41.41,-75.66],"183":[ 41.41,-75.66],
+  "184":[ 41.41,-75.66],"185":[ 41.24,-75.88],"186":[ 41.24,-75.88],"187":[ 41.24,-75.88],
+  "188":[ 40.62,-75.37],"189":[ 40.33,-75.93],
+  "190":[ 39.95,-75.16],"191":[ 39.95,-75.16],"192":[ 39.95,-75.16],"193":[ 40.10,-75.30],
+  "194":[ 40.20,-75.25],"195":[ 40.34,-75.93],"196":[ 39.75,-75.55],"197":[ 39.74,-75.55],
+  "198":[ 39.16,-75.52],"199":[ 39.16,-75.52],
+  "200":[ 38.90,-77.04],"201":[ 38.80,-77.05],"202":[ 38.90,-77.04],"203":[ 38.90,-77.04],
+  "204":[ 38.90,-77.04],"205":[ 38.90,-77.04],"206":[ 38.65,-76.87],"207":[ 38.65,-76.87],
+  "208":[ 39.08,-76.74],"209":[ 38.98,-76.94],
+  "210":[ 39.29,-76.61],"211":[ 39.29,-76.61],"212":[ 39.29,-76.61],"214":[ 39.00,-76.49],
+  "215":[ 39.41,-77.41],"216":[ 39.65,-78.76],"217":[ 39.41,-77.41],"218":[ 38.34,-75.60],
+  "219":[ 38.34,-75.60],
+  "220":[ 38.80,-77.05],"221":[ 38.80,-77.05],"222":[ 38.80,-77.17],"223":[ 38.74,-77.47],
+  "224":[ 38.03,-79.44],"225":[ 37.54,-77.44],"226":[ 37.27,-79.94],"227":[ 37.54,-77.44],
+  "228":[ 37.41,-79.14],"229":[ 37.54,-77.44],
+  "230":[ 37.54,-77.44],"231":[ 36.85,-76.29],"232":[ 37.54,-77.44],"233":[ 36.85,-76.29],
+  "234":[ 36.85,-76.29],"235":[ 36.85,-76.29],"236":[ 36.85,-76.29],"237":[ 36.85,-76.29],
+  "238":[ 37.54,-77.44],"239":[ 37.08,-76.50],
+  "240":[ 37.27,-79.94],"241":[ 37.27,-79.94],"242":[ 36.10,-79.83],"243":[ 37.27,-79.94],
+  "244":[ 37.81,-79.43],"245":[ 37.75,-78.87],"246":[ 37.78,-81.19],"247":[ 37.27,-81.22],
+  "248":[ 38.35,-81.63],"249":[ 38.35,-79.55],
+  "250":[ 38.35,-81.63],"251":[ 38.35,-81.63],"252":[ 38.35,-81.63],"253":[ 38.41,-82.45],
+  "254":[ 37.78,-81.19],"255":[ 38.35,-81.63],"256":[ 38.35,-81.63],"257":[ 37.78,-81.19],
+  "258":[ 37.78,-81.19],"259":[ 38.35,-81.63],
+  "260":[ 39.63,-79.96],"261":[ 39.27,-81.56],"262":[ 38.42,-82.45],"263":[ 39.28,-80.34],
+  "264":[ 39.28,-80.34],"265":[ 39.45,-77.96],"266":[ 39.28,-80.34],"267":[ 39.45,-77.96],
+  "268":[ 39.63,-79.96],
+  "270":[ 35.79,-78.64],"271":[ 36.10,-79.83],"272":[ 35.79,-78.64],"273":[ 36.10,-79.83],
+  "274":[ 36.10,-79.83],"275":[ 35.79,-78.64],"276":[ 36.07,-79.79],"277":[ 35.23,-80.84],
+  "278":[ 34.23,-77.94],"279":[ 35.60,-77.37],
+  "280":[ 35.23,-80.84],"281":[ 35.23,-80.84],"282":[ 35.23,-80.84],"283":[ 35.07,-80.93],
+  "284":[ 35.60,-82.55],"285":[ 35.60,-82.55],"286":[ 35.22,-80.84],"287":[ 35.60,-82.55],
+  "288":[ 35.22,-80.84],"289":[ 35.22,-80.84],
+  "290":[ 34.00,-81.03],"291":[ 34.00,-81.03],"292":[ 34.00,-81.03],"293":[ 32.78,-79.93],
+  "294":[ 32.78,-79.93],"295":[ 33.37,-79.28],"296":[ 34.85,-82.40],"297":[ 35.02,-81.93],
+  "298":[ 33.00,-80.18],"299":[ 32.08,-81.09],
+  "300":[ 33.75,-84.39],"301":[ 33.75,-84.39],"302":[ 33.75,-84.39],"303":[ 33.75,-84.39],
+  "304":[ 33.54,-83.87],"305":[ 34.77,-84.97],"306":[ 33.08,-83.23],"307":[ 32.46,-83.79],
+  "308":[ 33.47,-82.01],"309":[ 33.47,-82.01],
+  "310":[ 33.47,-82.01],"311":[ 33.75,-84.39],"312":[ 31.58,-84.18],"313":[ 31.58,-84.18],
+  "314":[ 30.84,-83.29],"315":[ 32.84,-83.63],"316":[ 31.96,-81.09],"317":[ 30.84,-83.29],
+  "318":[ 31.58,-84.18],"319":[ 32.08,-81.09],
+  "320":[ 30.33,-81.66],"321":[ 28.54,-81.38],"322":[ 30.33,-81.66],"323":[ 28.54,-81.38],
+  "324":[ 30.44,-84.28],"325":[ 29.65,-82.32],"326":[ 29.19,-82.14],"327":[ 28.54,-81.38],
+  "328":[ 28.54,-81.38],"329":[ 28.54,-81.38],
+  "330":[ 25.76,-80.19],"331":[ 25.76,-80.19],"332":[ 25.76,-80.19],"333":[ 25.76,-80.19],
+  "334":[ 26.12,-80.14],"335":[ 27.95,-82.46],"336":[ 27.95,-82.46],"337":[ 27.95,-82.46],
+  "338":[ 28.06,-80.62],"339":[ 26.71,-80.05],
+  "340":[ 25.76,-80.19],"341":[ 25.76,-80.19],"342":[ 25.76,-80.19],"344":[ 28.54,-81.38],
+  "346":[ 27.95,-82.46],"347":[ 28.54,-81.38],"349":[ 26.64,-81.87],
+  "350":[ 33.52,-86.81],"351":[ 33.52,-86.81],"352":[ 33.52,-86.81],"354":[ 33.52,-86.81],
+  "355":[ 33.52,-86.81],"356":[ 34.73,-86.59],"357":[ 34.73,-86.59],"358":[ 34.73,-86.59],
+  "359":[ 33.52,-86.81],
+  "360":[ 32.38,-86.30],"361":[ 32.38,-86.30],"362":[ 33.46,-85.99],"363":[ 33.21,-87.57],
+  "364":[ 31.23,-85.39],"365":[ 30.69,-88.04],"366":[ 30.69,-88.04],"367":[ 31.23,-85.39],
+  "368":[ 32.38,-86.30],"369":[ 31.80,-87.89],
+  "370":[ 36.17,-86.78],"371":[ 36.17,-86.78],"372":[ 36.17,-86.78],"373":[ 35.05,-85.31],
+  "374":[ 35.05,-85.31],"375":[ 35.96,-83.92],"376":[ 36.31,-82.35],"377":[ 35.96,-83.92],
+  "378":[ 35.96,-83.92],"379":[ 35.04,-85.31],
+  "380":[ 35.15,-90.05],"381":[ 35.15,-90.05],"382":[ 35.38,-89.52],"383":[ 35.62,-88.81],
+  "384":[ 35.62,-88.81],"385":[ 35.15,-90.05],"386":[ 34.26,-88.70],"387":[ 32.30,-90.18],
+  "388":[ 33.50,-88.43],"389":[ 32.30,-90.18],
+  "390":[ 32.30,-90.18],"391":[ 32.30,-90.18],"392":[ 32.30,-90.18],"393":[ 31.33,-89.29],
+  "394":[ 31.33,-89.29],"395":[ 30.40,-88.90],"396":[ 33.50,-88.43],"397":[ 33.45,-90.59],
+  "398":[ 33.50,-88.43],"399":[ 32.30,-90.18],
+  "400":[ 38.25,-85.76],"401":[ 38.25,-85.76],"402":[ 38.25,-85.76],"403":[ 37.75,-87.11],
+  "404":[ 38.04,-84.50],"405":[ 38.04,-84.50],"406":[ 37.08,-88.07],"407":[ 37.84,-83.94],
+  "408":[ 37.84,-83.94],"409":[ 37.84,-83.94],
+  "410":[ 38.25,-85.76],"411":[ 37.84,-83.94],"412":[ 37.84,-83.94],"413":[ 37.75,-87.11],
+  "414":[ 37.75,-87.11],"415":[ 37.08,-88.07],"416":[ 37.84,-83.94],"417":[ 37.84,-83.94],
+  "418":[ 37.84,-83.94],"420":[ 37.08,-88.07],
+  "421":[ 36.99,-86.44],"422":[ 37.98,-84.48],"423":[ 37.17,-86.26],"424":[ 37.75,-87.11],
+  "425":[ 38.06,-83.93],"426":[ 38.06,-83.93],"427":[ 37.84,-83.94],
+  "430":[ 39.96,-82.99],"431":[ 39.96,-82.99],"432":[ 39.96,-82.99],"433":[ 39.96,-82.99],
+  "434":[ 40.80,-81.38],"435":[ 40.80,-81.38],"436":[ 41.65,-83.54],"437":[ 39.33,-82.10],
+  "438":[ 39.33,-82.10],"439":[ 41.10,-81.07],
+  "440":[ 41.50,-81.69],"441":[ 41.50,-81.69],"442":[ 41.10,-81.07],"443":[ 41.10,-81.07],
+  "444":[ 41.10,-81.07],"445":[ 41.10,-80.65],"446":[ 40.80,-81.38],"447":[ 40.80,-81.38],
+  "448":[ 40.80,-81.38],"449":[ 40.80,-81.38],
+  "450":[ 39.10,-84.51],"451":[ 39.10,-84.51],"452":[ 39.10,-84.51],"453":[ 39.76,-84.19],
+  "454":[ 39.76,-84.19],"455":[ 39.76,-84.19],"456":[ 39.33,-82.10],"457":[ 39.33,-82.10],
+  "458":[ 40.34,-83.76],"459":[ 39.10,-84.51],
+  "460":[ 39.77,-86.16],"461":[ 39.77,-86.16],"462":[ 39.77,-86.16],"463":[ 39.77,-86.16],
+  "464":[ 40.92,-85.13],"465":[ 41.08,-85.14],"466":[ 41.08,-85.14],"467":[ 40.42,-86.89],
+  "468":[ 40.42,-86.89],"469":[ 39.17,-85.96],
+  "470":[ 39.10,-84.51],"471":[ 38.28,-85.83],"472":[ 39.17,-85.96],"473":[ 39.17,-86.53],
+  "474":[ 39.17,-86.53],"475":[ 39.47,-87.41],"476":[ 39.47,-87.41],"477":[ 38.68,-87.53],
+  "478":[ 39.47,-87.41],"479":[ 40.42,-86.89],
+  "480":[ 42.33,-83.05],"481":[ 42.33,-83.05],"482":[ 42.33,-83.05],"483":[ 42.97,-82.42],
+  "484":[ 43.42,-83.95],"485":[ 43.42,-83.95],"486":[ 43.42,-83.95],"487":[ 42.96,-85.66],
+  "488":[ 42.73,-84.56],"489":[ 42.73,-84.56],
+  "490":[ 42.96,-85.66],"491":[ 42.96,-85.66],"492":[ 42.29,-85.58],"493":[ 42.29,-85.58],
+  "494":[ 43.66,-84.25],"495":[ 42.96,-85.66],"496":[ 44.25,-85.40],"497":[ 44.76,-84.73],
+  "498":[ 45.78,-87.07],"499":[ 46.55,-87.40],
+  "500":[ 41.59,-93.61],"501":[ 41.59,-93.61],"502":[ 41.59,-93.61],"503":[ 41.59,-93.61],
+  "504":[ 42.50,-92.33],"505":[ 41.66,-91.53],"506":[ 42.50,-92.33],"507":[ 41.26,-95.86],
+  "508":[ 42.03,-93.47],"509":[ 41.26,-95.86],
+  "510":[ 42.50,-96.40],"511":[ 42.50,-96.40],"512":[ 41.26,-95.86],"513":[ 41.26,-95.86],
+  "514":[ 40.81,-91.11],"515":[ 41.59,-93.61],"516":[ 41.26,-95.86],"520":[ 42.50,-90.66],
+  "521":[ 42.50,-90.66],"522":[ 41.66,-91.53],
+  "523":[ 41.66,-91.53],"524":[ 41.40,-91.04],"525":[ 40.81,-91.11],"526":[ 41.40,-91.04],
+  "527":[ 42.03,-93.47],"528":[ 42.50,-92.33],
+  "530":[ 43.07,-89.40],"531":[ 42.73,-87.78],"532":[ 42.73,-87.78],"534":[ 42.73,-87.78],
+  "535":[ 43.07,-89.40],"537":[ 43.07,-89.40],"538":[ 43.07,-89.40],"539":[ 43.78,-89.17],
+  "540":[ 44.52,-88.02],"541":[ 44.52,-88.02],
+  "542":[ 44.52,-88.02],"543":[ 44.52,-88.02],"544":[ 44.97,-89.63],"545":[ 44.97,-89.63],
+  "546":[ 44.52,-89.57],"547":[ 43.81,-91.25],"548":[ 45.52,-89.58],"549":[ 46.72,-92.10],
+  "550":[ 44.98,-93.27],"551":[ 44.98,-93.27],"553":[ 44.98,-93.27],"554":[ 44.98,-93.27],
+  "555":[ 44.98,-93.27],"556":[ 46.87,-96.77],"557":[ 44.16,-93.99],"558":[ 44.44,-95.00],
+  "559":[ 45.57,-94.16],"560":[ 44.16,-93.99],
+  "561":[ 44.16,-93.99],"562":[ 44.16,-93.99],"563":[ 43.65,-93.37],"564":[ 45.56,-94.16],
+  "565":[ 47.47,-94.88],"566":[ 47.92,-97.04],"567":[ 46.87,-96.77],
+  "570":[ 43.55,-96.73],"571":[ 43.55,-96.73],"572":[ 44.37,-98.21],"573":[ 44.37,-100.35],
+  "574":[ 44.31,-96.79],"575":[ 43.55,-96.73],"576":[ 45.46,-98.49],"577":[ 44.08,-103.23],
+  "580":[ 46.88,-96.79],"581":[ 46.88,-96.79],"582":[ 46.88,-96.79],"583":[ 47.92,-97.04],
+  "584":[ 46.88,-96.79],"585":[ 47.92,-97.04],"586":[ 48.23,-101.30],"587":[ 46.81,-100.78],
+  "588":[ 48.23,-101.30],
+  "590":[ 45.78,-108.50],"591":[ 45.78,-108.50],"592":[ 46.80,-100.78],"593":[ 47.51,-111.28],
+  "594":[ 47.51,-111.28],"595":[ 45.78,-108.50],"596":[ 47.51,-111.28],"597":[ 45.78,-108.50],
+  "598":[ 46.59,-112.04],"599":[ 48.55,-109.68],
+  "600":[ 41.88,-87.63],"601":[ 41.88,-87.63],"602":[ 42.05,-87.68],"603":[ 41.88,-87.63],
+  "604":[ 42.05,-87.68],"605":[ 42.05,-87.68],"606":[ 41.88,-87.63],"607":[ 41.88,-87.63],
+  "608":[ 41.88,-87.63],"609":[ 41.51,-87.66],
+  "610":[ 41.51,-90.58],"611":[ 41.51,-90.58],"612":[ 41.51,-90.58],"613":[ 40.69,-89.59],
+  "614":[ 40.69,-89.59],"615":[ 40.69,-89.59],"616":[ 40.69,-89.59],"617":[ 40.12,-88.24],
+  "618":[ 40.12,-88.24],"619":[ 40.12,-88.24],
+  "620":[ 39.80,-89.65],"622":[ 38.63,-90.19],"623":[ 38.52,-89.13],"624":[ 38.52,-89.13],
+  "625":[ 39.80,-89.65],"626":[ 39.80,-89.65],"627":[ 39.80,-89.65],"628":[ 38.52,-89.13],
+  "629":[ 37.72,-89.22],
+  "630":[ 38.63,-90.20],"631":[ 38.63,-90.20],"633":[ 38.63,-90.20],"634":[ 38.52,-89.98],
+  "635":[ 38.52,-89.98],"636":[ 37.96,-91.77],"637":[ 36.74,-90.41],"638":[ 37.96,-91.77],
+  "639":[ 37.96,-91.77],
+  "640":[ 39.10,-94.58],"641":[ 39.10,-94.58],"644":[ 38.58,-94.83],"645":[ 38.58,-94.83],
+  "646":[ 38.58,-94.83],"647":[ 37.84,-94.70],"648":[ 38.58,-92.17],"649":[ 38.58,-92.17],
+  "650":[ 38.58,-92.17],"651":[ 38.58,-92.17],
+  "652":[ 38.58,-92.17],"653":[ 38.58,-92.17],"654":[ 37.21,-93.29],"655":[ 37.21,-93.29],
+  "656":[ 37.21,-93.29],"657":[ 37.21,-93.29],"658":[ 39.10,-94.58],"659":[ 39.10,-94.58],
+  "660":[ 39.10,-94.58],"661":[ 39.10,-94.58],
+  "662":[ 39.05,-95.68],"664":[ 39.05,-95.68],"665":[ 39.05,-95.68],"666":[ 39.05,-95.68],
+  "667":[ 38.84,-97.61],"668":[ 39.05,-95.68],"669":[ 38.84,-97.61],"670":[ 37.69,-97.34],
+  "671":[ 37.69,-97.34],"672":[ 37.69,-97.34],
+  "673":[ 37.22,-95.71],"674":[ 38.84,-97.61],"675":[ 37.69,-97.34],"676":[ 38.76,-99.32],
+  "677":[ 37.69,-97.34],"678":[ 38.76,-99.32],"679":[ 37.88,-100.56],
+  "680":[ 41.26,-95.94],"681":[ 41.26,-95.94],"683":[ 41.26,-95.94],"684":[ 41.26,-95.94],
+  "685":[ 40.82,-96.70],"686":[ 40.82,-96.70],"687":[ 40.82,-96.70],"688":[ 40.82,-96.70],
+  "689":[ 40.82,-96.70],"690":[ 40.82,-96.70],
+  "691":[ 41.13,-100.77],"692":[ 42.03,-97.42],"693":[ 41.13,-100.77],
+  "700":[ 29.95,-90.07],"701":[ 29.95,-90.07],"703":[ 30.22,-92.02],"704":[ 30.22,-92.02],
+  "705":[ 30.22,-92.02],"706":[ 30.45,-91.19],"707":[ 30.45,-91.19],"708":[ 30.45,-91.19],
+  "710":[ 32.51,-93.75],"711":[ 32.51,-93.75],
+  "712":[ 32.51,-93.75],"713":[ 31.31,-92.45],"714":[ 31.31,-92.45],"716":[ 32.51,-93.75],
+  "717":[ 32.51,-93.75],"718":[ 32.51,-93.75],"719":[ 32.51,-93.75],
+  "720":[ 71.29,-156.79],"722":[ 33.66,-93.60],"723":[ 33.66,-93.60],"724":[ 33.66,-93.60],
+  "725":[ 34.74,-92.28],"726":[ 36.07,-94.17],"727":[ 36.37,-94.21],"728":[ 35.39,-94.40],
+  "729":[ 35.39,-94.40],
+  "730":[ 35.47,-97.52],"731":[ 35.47,-97.52],"734":[ 34.62,-98.49],"735":[ 35.47,-97.52],
+  "736":[ 35.47,-97.52],"737":[ 34.62,-98.49],"738":[ 36.13,-97.06],"739":[ 36.13,-97.06],
+  "740":[ 36.13,-95.99],"741":[ 36.13,-95.99],
+  "743":[ 36.13,-95.99],"744":[ 36.40,-94.80],"745":[ 35.47,-95.39],"746":[ 34.18,-97.14],
+  "747":[ 34.62,-98.49],"748":[ 35.47,-97.52],"749":[ 34.62,-97.23],
+  "750":[ 32.78,-96.80],"751":[ 32.78,-96.80],"752":[ 32.78,-96.80],"753":[ 32.78,-96.80],
+  "754":[ 33.21,-97.13],"755":[ 33.21,-97.13],"756":[ 32.45,-100.45],"757":[ 33.91,-98.49],
+  "758":[ 32.45,-100.45],"759":[ 33.45,-94.05],
+  "760":[ 32.73,-97.33],"761":[ 32.73,-97.33],"762":[ 32.73,-97.33],"763":[ 31.55,-97.15],
+  "764":[ 32.73,-97.33],"765":[ 31.55,-97.15],"766":[ 31.55,-97.15],"767":[ 31.55,-97.15],
+  "768":[ 32.45,-100.45],"769":[ 32.45,-100.45],
+  "770":[ 29.76,-95.37],"771":[ 29.76,-95.37],"772":[ 29.76,-95.37],"773":[ 29.76,-95.37],
+  "774":[ 29.76,-95.37],"775":[ 29.76,-95.37],"776":[ 30.08,-94.13],"777":[ 30.08,-94.13],
+  "778":[ 28.80,-97.40],"779":[ 27.80,-97.40],
+  "780":[ 29.42,-98.49],"781":[ 29.42,-98.49],"782":[ 29.42,-98.49],"783":[ 27.50,-99.50],
+  "784":[ 27.50,-99.50],"785":[ 26.20,-98.23],"786":[ 30.27,-97.74],"787":[ 30.27,-97.74],
+  "788":[ 29.42,-98.49],"789":[ 30.27,-97.74],
+  "790":[ 33.58,-101.85],"791":[ 35.22,-101.83],"792":[ 35.22,-101.83],"793":[ 33.58,-101.85],
+  "794":[ 31.76,-106.44],"795":[ 31.76,-106.44],"796":[ 31.76,-106.44],"797":[ 31.46,-100.44],
+  "798":[ 31.76,-106.44],"799":[ 31.76,-106.44],
+  "800":[ 39.74,-104.99],"801":[ 39.74,-104.99],"802":[ 39.74,-104.99],"803":[ 39.74,-104.99],
+  "804":[ 39.74,-104.99],"805":[ 40.59,-105.08],"806":[ 40.59,-105.08],"807":[ 38.83,-104.82],
+  "808":[ 38.83,-104.82],"809":[ 38.83,-104.82],
+  "810":[ 38.83,-104.82],"811":[ 38.25,-104.61],"812":[ 38.25,-104.61],"813":[ 37.27,-107.88],
+  "814":[ 39.06,-108.55],"815":[ 39.06,-108.55],"816":[ 39.64,-106.37],
+  "820":[ 41.14,-104.82],"821":[ 41.14,-104.82],"822":[ 42.85,-106.33],"823":[ 42.85,-106.33],
+  "824":[ 42.85,-106.33],"825":[ 44.28,-105.50],"826":[ 42.85,-106.33],"827":[ 43.73,-110.68],
+  "828":[ 44.78,-108.70],"829":[ 41.31,-108.67],
+  "830":[ 40.77,-111.89],"831":[ 40.77,-111.89],"832":[ 42.87,-112.44],"833":[ 42.87,-112.44],
+  "834":[ 43.62,-116.21],"835":[ 46.73,-117.00],"836":[ 43.62,-116.21],"837":[ 43.62,-116.21],
+  "838":[ 43.62,-116.21],
+  "840":[ 40.77,-111.89],"841":[ 40.77,-111.89],"842":[ 40.77,-111.89],"843":[ 41.22,-111.97],
+  "844":[ 40.23,-111.66],"845":[ 38.57,-109.55],"846":[ 38.57,-109.55],"847":[ 39.32,-111.09],
+  "850":[ 33.45,-112.07],"851":[ 33.45,-112.07],"852":[ 33.45,-112.07],"853":[ 33.45,-112.07],
+  "855":[ 33.45,-112.07],"856":[ 32.22,-110.97],"857":[ 32.22,-110.97],
+  "859":[ 34.54,-112.47],"860":[ 35.20,-111.65],"863":[ 34.54,-112.47],
+  "864":[ 33.31,-111.84],"865":[ 33.31,-111.84],
+  "870":[ 35.08,-106.65],"871":[ 35.08,-106.65],"872":[ 35.08,-106.65],"873":[ 35.08,-106.65],
+  "874":[ 35.68,-105.94],"875":[ 35.08,-106.65],"877":[ 35.60,-106.10],"878":[ 34.52,-105.57],
+  "879":[ 32.34,-106.76],"880":[ 32.34,-106.76],
+  "881":[ 33.39,-104.52],"882":[ 33.39,-104.52],"883":[ 32.34,-106.76],"884":[ 32.34,-106.76],
+  "885":[ 31.76,-106.44],"890":[ 36.17,-115.14],"891":[ 36.17,-115.14],"893":[ 39.53,-119.81],
+  "894":[ 39.53,-119.81],"895":[ 39.53,-119.81],"897":[ 39.53,-119.81],"898":[ 39.53,-119.81],
+  "900":[ 34.05,-118.24],"901":[ 34.05,-118.24],"902":[ 34.10,-118.33],"903":[ 34.10,-118.33],
+  "904":[ 34.10,-118.33],"905":[ 33.97,-118.24],"906":[ 34.10,-118.33],"907":[ 34.10,-118.33],
+  "908":[ 34.10,-118.33],"910":[ 34.04,-118.69],
+  "911":[ 34.18,-118.31],"912":[ 34.10,-118.33],"913":[ 34.03,-118.14],"914":[ 34.10,-118.13],
+  "915":[ 34.19,-118.54],"916":[ 34.19,-118.54],"917":[ 34.05,-117.75],"918":[ 34.05,-117.75],
+  "919":[ 34.06,-117.59],
+  "920":[ 32.72,-117.16],"921":[ 32.72,-117.16],"922":[ 33.74,-116.35],"923":[ 33.95,-117.40],
+  "924":[ 33.95,-117.40],"925":[ 33.95,-117.40],"926":[ 33.72,-117.83],"927":[ 33.72,-117.83],
+  "928":[ 33.72,-117.83],
+  "930":[ 34.42,-119.70],"931":[ 34.42,-119.70],"932":[ 35.37,-119.02],"933":[ 35.37,-119.02],
+  "934":[ 34.95,-120.43],"935":[ 36.75,-119.77],"936":[ 36.75,-119.77],"937":[ 36.75,-119.77],
+  "938":[ 36.75,-119.77],"939":[ 36.97,-121.97],
+  "940":[ 37.78,-122.42],"941":[ 37.78,-122.42],"942":[ 37.75,-122.45],"943":[ 37.47,-122.22],
+  "944":[ 37.78,-122.42],"945":[ 37.80,-122.27],"946":[ 37.80,-122.27],"947":[ 37.87,-122.27],
+  "948":[ 37.87,-122.27],"949":[ 37.96,-122.35],
+  "950":[ 37.34,-121.89],"951":[ 37.34,-121.89],"952":[ 37.41,-121.88],"953":[ 37.41,-121.88],
+  "954":[ 37.41,-121.88],"955":[ 40.58,-122.39],"956":[ 38.58,-121.49],"957":[ 38.58,-121.49],
+  "958":[ 38.58,-121.49],"959":[ 38.58,-121.49],
+  "960":[ 38.58,-121.49],"961":[ 39.53,-119.81],"962":[ 61.22,-149.90],"963":[ 21.31,-157.86],
+  "964":[ 19.72,-155.08],"965":[ 21.31,-157.86],"966":[ 21.31,-157.86],"967":[ 21.31,-157.86],
+  "968":[ 21.31,-157.86],
+  "970":[ 45.52,-122.68],"971":[ 45.52,-122.68],"972":[ 45.52,-122.68],"973":[ 44.94,-123.03],
+  "974":[ 44.05,-121.31],"975":[ 42.33,-122.87],"976":[ 44.05,-121.31],"977":[ 44.94,-123.03],
+  "978":[ 45.67,-118.79],"979":[ 43.62,-116.21],
+  "980":[ 47.61,-122.33],"981":[ 47.61,-122.33],"982":[ 47.25,-122.44],"983":[ 47.25,-122.44],
+  "984":[ 47.25,-122.44],"985":[ 47.04,-122.90],"986":[ 45.64,-122.66],"988":[ 47.66,-117.43],
+  "989":[ 47.66,-117.43],"990":[ 47.66,-117.43],
+  "991":[ 47.66,-117.43],"992":[ 47.66,-117.43],"993":[ 46.73,-117.00],"994":[ 47.04,-122.90],
+  "995":[ 61.22,-149.90],"996":[ 64.84,-147.72],"997":[ 61.22,-149.90],"998":[ 58.30,-134.42],
+  "999":[ 62.00,-163.00]
+};
+
+// State approximate centers for AAFES etc with state but no valid zip
+const STATE_COORDS = {
+  "AL":[32.81,-86.79],"AK":[61.37,-152.40],"AZ":[34.05,-111.09],"AR":[34.97,-92.37],
+  "CA":[36.78,-119.42],"CO":[39.55,-105.78],"CT":[41.60,-72.76],"DE":[39.00,-75.50],
+  "FL":[27.66,-81.52],"GA":[33.04,-83.64],"HI":[21.09,-157.50],"ID":[44.07,-114.74],
+  "IL":[40.35,-89.00],"IN":[39.85,-86.26],"IA":[42.01,-93.21],"KS":[38.53,-96.73],
+  "KY":[37.67,-84.67],"LA":[31.17,-91.87],"ME":[44.69,-69.38],"MD":[39.06,-76.80],
+  "MA":[42.23,-71.53],"MI":[43.33,-84.54],"MN":[45.69,-93.90],"MS":[32.74,-89.68],
+  "MO":[38.46,-92.29],"MT":[46.80,-110.36],"NE":[41.12,-98.27],"NV":[38.31,-117.07],
+  "NH":[43.45,-71.56],"NJ":[40.30,-74.52],"NM":[34.84,-106.25],"NY":[42.17,-74.95],
+  "NC":[35.63,-79.81],"ND":[47.53,-99.78],"OH":[40.39,-82.76],"OK":[35.57,-96.93],
+  "OR":[44.57,-122.07],"PA":[40.59,-77.21],"RI":[41.68,-71.51],"SC":[33.86,-80.95],
+  "SD":[44.30,-99.44],"TN":[35.75,-86.25],"TX":[31.05,-97.56],"UT":[40.15,-111.86],
+  "VT":[44.05,-72.71],"VA":[37.77,-78.17],"WA":[47.40,-121.49],"WV":[38.49,-80.95],
+  "WI":[44.27,-89.62],"WY":[42.76,-107.30],"DC":[38.91,-77.04],
+  "PR":[18.22,-66.59],"VI":[18.34,-64.93],"GU":[13.44,144.79],"AS":[-14.27,-170.70],
+  "MP":[15.18,145.75],
+  "AA":[38.90,-77.04],"AE":[50.11,8.68],"AP":[35.68,139.69]
+};
+
+// ── State Data Normalization ──
+const KNOWN_STATE_FIXES = {
+  "FP":"AE", "DP":"AE", "RO":"AE", "IM":"AP", "CS":"PR", "AD":"PR"
+};
+const CANADIAN_PROVINCES = new Set([
+  "AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"
+]);
+const PROVINCE_COORDS = {
+  "AB":[53.93,-116.58],"BC":[53.73,-127.65],"MB":[56.42,-98.74],
+  "NB":[46.57,-66.46],"NL":[53.14,-57.66],"NS":[44.68,-63.74],
+  "NT":[64.27,-119.18],"NU":[70.30,-83.11],"ON":[51.25,-85.32],
+  "PE":[46.24,-63.13],"QC":[52.94,-73.55],"SK":[52.94,-106.45],
+  "YT":[64.28,-135.00]
+};
+const JUNK_STATES = new Set(["COLUMBIA","02"]);
+
+// ── US Census Bureau Regions (4 Regions, 9 Divisions) ──
+const US_REGIONS = {
+  "Northeast": {
+    color: "#6366f1",
+    divisions: {
+      "New England": ["CT","ME","MA","NH","RI","VT"],
+      "Middle Atlantic": ["NJ","NY","PA"]
+    },
+    states: ["CT","ME","MA","NH","RI","VT","NJ","NY","PA"],
+    center: [42.5, -74.0],
+    bounds: [
+      // ME/Canada NW corner → ME north border east
+      [47.46,-69.22],[47.36,-68.38],[47.07,-67.79],[46.57,-67.79],
+      [45.94,-67.01],[45.60,-67.15],[44.82,-66.95],
+      // ME coast → MA → RI → CT coast → NY → NJ
+      [43.88,-69.80],[43.57,-70.20],[42.88,-70.57],[42.05,-70.08],
+      [41.67,-69.93],[41.24,-69.96],[41.30,-71.10],
+      [41.18,-71.19],[41.06,-71.86],[40.98,-72.00],[41.10,-72.08],
+      [40.96,-72.57],[40.63,-73.26],[40.58,-74.04],
+      // NJ coast → DE border
+      [40.49,-74.26],[39.90,-74.92],[39.72,-75.56],
+      // PA south border west
+      [39.72,-76.23],[39.72,-77.47],[39.72,-78.55],[39.72,-79.48],[39.72,-80.52],
+      // PA/NY west border → Lake Erie → Lake Ontario
+      [41.00,-80.52],[42.00,-80.52],[42.00,-79.76],[42.53,-79.76],
+      [42.87,-78.91],[43.27,-79.07],[43.45,-79.21],
+      // NY Lake Ontario → St Lawrence → Canada border
+      [43.64,-78.72],[43.63,-76.82],[44.10,-76.36],
+      [44.37,-75.85],[44.70,-75.17],[44.99,-74.74],
+      [45.01,-74.02],[45.01,-73.34],[45.01,-71.50],
+      [45.31,-71.08],[45.59,-70.83],[46.42,-70.26],
+      [46.69,-70.03],[47.18,-69.24],[47.46,-69.22]
+    ]
+  },
+  "Midwest": {
+    color: "#22c55e",
+    divisions: {
+      "East North Central": ["IL","IN","MI","OH","WI"],
+      "West North Central": ["IA","KS","MN","MO","NE","ND","SD"]
+    },
+    states: ["IL","IN","MI","OH","WI","IA","KS","MN","MO","NE","ND","SD"],
+    center: [42.0, -90.0],
+    bounds: [
+      // OH NE corner at Lake Erie → OH/PA south border
+      [42.00,-80.52],[41.00,-80.52],[39.72,-80.52],
+      // OH/WV border south then KY/OH along Ohio River
+      [39.46,-80.52],[39.28,-80.60],[39.13,-79.49],
+      [38.76,-79.44],[38.46,-79.69],[38.35,-79.97],
+      [37.72,-80.29],[37.32,-80.83],[37.51,-81.07],
+      [38.27,-81.32],[38.59,-81.81],[38.47,-82.03],
+      [38.17,-82.22],[38.44,-82.64],
+      // Ohio River: OH/IN/IL north bank → KY south bank
+      [39.10,-84.51],[39.10,-84.82],[38.73,-84.81],
+      [38.72,-85.02],[38.47,-85.42],[38.29,-85.65],
+      [37.99,-85.96],[37.83,-86.19],[38.04,-86.51],
+      [38.19,-86.81],[38.04,-87.31],[37.89,-87.41],
+      [37.79,-87.67],[37.91,-87.93],[37.80,-88.01],
+      [37.51,-88.42],[37.23,-88.61],[37.07,-88.47],
+      // IL south tip → MO bootheel → MO/AR border
+      [36.97,-89.13],[36.68,-89.57],[36.50,-89.41],
+      [36.30,-89.54],[35.97,-89.69],[36.10,-90.06],
+      [36.50,-90.15],[36.50,-90.65],
+      // MO south border west
+      [36.50,-91.41],[36.50,-92.30],[36.50,-93.10],
+      [36.50,-94.07],[36.50,-94.62],
+      // KS south border west
+      [37.00,-94.62],[37.00,-96.00],[37.00,-97.50],
+      [37.00,-99.00],[37.00,-100.50],[37.00,-102.05],
+      // NE west → WY/SD/ND west borders north
+      [40.00,-102.05],[41.00,-102.05],[41.00,-104.05],
+      [43.00,-104.06],[44.00,-104.06],[45.94,-104.05],
+      // ND Canadian border (49th parallel)
+      [49.00,-104.05],[49.00,-99.00],[49.00,-97.23],
+      // MN NW angle → Lake of the Woods → Lake Superior
+      [49.38,-95.16],[49.00,-95.16],[48.72,-94.68],
+      [48.12,-92.31],[47.73,-91.55],[47.46,-90.87],
+      [46.95,-90.45],[46.77,-89.97],
+      // WI/MI UP north shore → Lake Michigan
+      [46.51,-90.42],[46.10,-90.42],[46.30,-89.92],
+      [46.59,-88.94],[46.49,-87.80],[46.10,-86.96],
+      [45.82,-86.07],[45.44,-86.25],[45.12,-87.07],
+      [44.72,-87.63],[44.36,-87.61],[43.81,-87.71],
+      [43.02,-87.80],[42.49,-87.53],
+      // IL/IN/OH Lake Michigan & Erie shore
+      [41.76,-87.53],[41.76,-86.82],[41.76,-84.81],
+      [41.73,-83.45],[41.50,-83.10],[41.38,-82.69],
+      [41.50,-81.73],[41.68,-81.46],[42.00,-81.21],
+      [42.00,-80.52]
+    ]
+  },
+  "South": {
+    color: "#f59e0b",
+    divisions: {
+      "South Atlantic": ["DE","DC","FL","GA","MD","NC","SC","VA","WV"],
+      "East South Central": ["AL","KY","MS","TN"],
+      "West South Central": ["AR","LA","OK","TX"]
+    },
+    states: ["DE","DC","FL","GA","MD","NC","SC","VA","WV","AL","KY","MS","TN","AR","LA","OK","TX"],
+    center: [33.5, -88.0],
+    bounds: [
+      // DE/PA border → DE/MD Atlantic coast south
+      [39.72,-75.56],[39.52,-75.53],[38.80,-75.05],
+      [38.45,-75.05],[37.95,-75.62],[37.20,-75.97],
+      // VA/NC Outer Banks → SC → GA coast
+      [36.55,-75.87],[35.26,-75.53],[34.30,-77.53],
+      [33.85,-78.01],[33.18,-79.19],[32.03,-80.85],
+      [31.13,-81.17],[30.71,-81.44],[30.36,-81.76],
+      // FL Atlantic coast → Keys → Gulf coast
+      [29.72,-81.24],[29.00,-80.97],[27.17,-80.14],
+      [25.85,-80.28],[25.12,-80.38],[24.55,-81.81],
+      [25.14,-81.36],[25.79,-81.70],[26.50,-82.10],
+      [28.00,-82.80],[28.95,-83.05],[29.21,-83.25],
+      // FL panhandle Gulf coast
+      [29.65,-83.39],[29.92,-84.04],[29.76,-84.88],
+      [29.62,-85.38],[30.28,-86.26],[30.27,-87.24],
+      [30.38,-87.60],[30.25,-88.07],
+      // MS/AL/LA Gulf coast
+      [30.21,-88.79],[30.20,-89.59],[29.38,-89.49],
+      [29.07,-89.50],[28.93,-89.40],[29.17,-90.03],
+      [29.07,-90.65],[29.50,-91.33],[29.55,-92.00],
+      [29.78,-93.38],[29.57,-94.69],[29.30,-94.73],
+      // TX Gulf coast → Mexico border
+      [28.63,-95.86],[28.17,-96.59],[27.69,-97.08],
+      [27.28,-97.37],[26.50,-97.26],[25.97,-97.18],
+      [25.96,-97.36],[26.06,-97.57],
+      // Rio Grande / TX-Mexico border
+      [26.43,-98.78],[27.77,-99.70],[29.02,-100.67],
+      [29.58,-101.40],[29.78,-101.99],[30.29,-103.33],
+      [30.63,-104.02],[31.08,-104.40],[31.33,-104.94],
+      [31.78,-106.44],
+      // TX/NM state line north
+      [32.00,-106.63],[32.00,-103.07],[32.00,-103.06],
+      [33.00,-103.04],[34.00,-103.04],[36.50,-103.00],
+      // OK panhandle north → KS border east
+      [36.99,-103.00],[37.00,-102.05],
+      [37.00,-100.50],[37.00,-99.00],[37.00,-97.50],
+      [37.00,-96.00],[37.00,-94.62],
+      // OK/MO/AR east border → MO bootheel
+      [36.50,-94.62],[36.50,-94.07],[36.50,-93.10],
+      [36.50,-92.30],[36.50,-91.41],[36.50,-90.65],
+      [36.50,-90.15],[36.10,-90.06],[35.97,-89.69],
+      [36.30,-89.54],[36.50,-89.41],
+      // TN/KY border → Ohio River east
+      [36.68,-89.57],[36.97,-89.13],
+      [37.07,-88.47],[37.23,-88.61],[37.51,-88.42],
+      [37.80,-88.01],[37.91,-87.93],[37.79,-87.67],
+      [37.89,-87.41],[38.04,-87.31],[38.19,-86.81],
+      [38.04,-86.51],[37.83,-86.19],[37.99,-85.96],
+      [38.29,-85.65],[38.47,-85.42],[38.72,-85.02],
+      [38.73,-84.81],[39.10,-84.82],[39.10,-84.51],
+      // KY/WV north border → WV/PA border
+      [38.44,-82.64],[38.17,-82.22],[38.47,-82.03],
+      [38.59,-81.81],[38.27,-81.32],[37.51,-81.07],
+      [37.32,-80.83],[37.72,-80.29],[38.35,-79.97],
+      [38.46,-79.69],[38.76,-79.44],[39.13,-79.49],
+      [39.28,-80.60],[39.46,-80.52],
+      // PA/MD/DE border back east to start
+      [39.72,-80.52],[39.72,-79.48],[39.72,-78.55],
+      [39.72,-77.47],[39.72,-76.23],[39.72,-75.56]
+    ]
+  },
+  "West": {
+    color: "#06b6d4",
+    divisions: {
+      "Mountain": ["AZ","CO","ID","MT","NV","NM","UT","WY"],
+      "Pacific": ["AK","CA","HI","OR","WA"]
+    },
+    states: ["AZ","CO","ID","MT","NV","NM","UT","WY","AK","CA","HI","OR","WA"],
+    center: [42.0, -114.0],
+    bounds: [
+      // MT/Canada 49th parallel east to ND border
+      [49.00,-116.05],[49.00,-113.00],[49.00,-110.00],[49.00,-104.05],
+      // MT/WY/CO east borders south (shared with Midwest)
+      [45.94,-104.05],[44.00,-104.06],[43.00,-104.06],
+      [41.00,-104.05],[41.00,-102.05],[40.00,-102.05],
+      [37.00,-102.05],
+      // CO/NM east border south (shared with South at OK panhandle)
+      [36.99,-103.00],[36.50,-103.00],
+      [34.00,-103.04],[33.00,-103.04],[32.00,-103.06],
+      [32.00,-103.07],[32.00,-106.63],
+      // NM/TX border → NM south → AZ south (Mexico border)
+      [31.78,-106.44],[31.78,-106.53],[31.33,-106.63],
+      [31.33,-108.21],[31.33,-109.05],
+      [31.33,-110.46],[31.34,-111.07],
+      [31.73,-111.37],[31.35,-112.86],
+      [32.51,-114.81],
+      // AZ/CA border → CA/Mexico border
+      [32.72,-114.72],[32.54,-117.12],
+      // CA Pacific coast north
+      [32.62,-117.14],[33.17,-117.33],[33.72,-118.30],
+      [34.04,-118.53],[34.03,-119.22],[34.45,-119.88],
+      [34.46,-120.47],[35.17,-120.73],[35.62,-121.19],
+      [36.30,-121.90],[36.81,-121.93],[37.18,-122.39],
+      [37.78,-122.51],[38.36,-123.07],[39.33,-123.74],
+      [40.43,-124.41],[41.75,-124.20],[42.84,-124.56],
+      [44.64,-124.07],[46.24,-124.02],[47.35,-124.46],
+      // WA coast → Strait of Juan de Fuca → Canada
+      [48.38,-124.73],[48.99,-124.77],
+      [49.00,-123.32],[49.00,-120.85],[49.00,-117.43],
+      [49.00,-116.05]
+    ]
+  },
+  "Territories": {
+    color: "#a855f7",
+    divisions: {
+      "Territories": ["PR","VI","GU","AS","MP"]
+    },
+    states: ["PR","VI","GU","AS","MP","AA","AE","AP"],
+    center: [18.2, -66.5],
+    bounds: [
+      [18.53,-67.27],[18.52,-65.59],[17.88,-65.58],[17.88,-67.28]
+    ]
+  }
+};
+
+// Build reverse lookup: state → region
+const STATE_TO_REGION = {};
+Object.entries(US_REGIONS).forEach(([regionName, regionData]) => {
+  regionData.states.forEach(st => { STATE_TO_REGION[st] = regionName; });
+});
+
+// Customer color palette
+const COLORS = [
+  '#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#f97316',
+  '#14b8a6','#8b5cf6','#84cc16','#e11d48','#0ea5e9','#d946ef','#eab308','#6366f1',
+  '#10b981','#f43f5e','#0891b2','#c026d3','#65a30d','#dc2626','#2563eb','#7c3aed',
+  '#059669','#db2777','#ca8a04','#4f46e5','#16a34a','#e879f9'
+];
+
+// ── InComm Printer / Supplier Locations ──
+const PRINTERS = [
+  { name: 'Atlantic Tape', address: '755 Coweta Industrial Parkway, STE C', city: 'Newnan', state: 'GA', zip: '30265', material: 'Corrugate/Packaging Materials', deliveries: 22 },
+  { name: 'Diamond Graphics', address: '14350 Azurite St NW', city: 'Ramsey', state: 'MN', zip: '55303', material: 'Card Stock', deliveries: 135 },
+  { name: 'CPI', address: '3055 Long Lake Rd', city: 'Roseville', state: 'MN', zip: '55113', material: 'Card Stock', deliveries: 171 },
+  { name: 'MPS-Chicago/Westrock', address: '2300 Internationale Parkway', city: 'Woodridge', state: 'IL', zip: '60517', material: 'Card Stock', deliveries: 76 },
+  { name: 'Drive Display', address: '1401 165th St', city: 'Hammond', state: 'IN', zip: '46320', material: 'Non-Card Stock/Displays', deliveries: 17 },
+  { name: 'Taylor Print & Packaging', address: '5601 E River Rd', city: 'Fridley', state: 'MN', zip: '55432', material: 'Card Stock', deliveries: 8 },
+  { name: 'PLI-Las Vegas', address: '1030 E Craig Rd', city: 'North Las Vegas', state: 'NV', zip: '89030', material: 'Card Stock', deliveries: 173 },
+  { name: 'Drummond', address: '5664 New Peachtree Rd', city: 'Atlanta', state: 'GA', zip: '30341', material: 'Non-Card Stock/Displays', deliveries: 3 },
+  { name: 'Tracfone/MAD Studios', address: '7939 NW 84 St', city: 'Medley', state: 'FL', zip: '33166', material: 'Card Stock', deliveries: 46 },
+  { name: 'G&D Secure Packaging', address: '325 Marmon Drive', city: 'Bolingbrook', state: 'IL', zip: '60440', material: 'Card Stock', deliveries: 3 },
+  { name: 'Green Dot', address: '1590 Williams Road', city: 'Columbus', state: 'OH', zip: '43207', material: 'Card Stock', deliveries: 7 },
+  { name: 'Intech Direct', address: '1200 Barclay Blvd', city: 'Buffalo Grove', state: 'IL', zip: '60089', material: 'Card Stock', deliveries: 17 },
+  { name: 'Optimum Card Solutions', address: '2801 Centre Circle, Unit A', city: 'Downers Grove', state: 'IL', zip: '60515', material: 'Card Stock', deliveries: 22 },
+  { name: 'ABCorp', address: '225 Rivermoor St.', city: 'West Roxbury', state: 'MA', zip: '02132', material: 'Card Stock', deliveries: 2 },
+  { name: 'Allegheny Printed Plastics', address: '1224 Freedom Rd', city: 'Cranberry Township', state: 'PA', zip: '16066', material: 'Card Stock', deliveries: 15 },
+  { name: 'Allcard Ltd', address: '765 Boxwood Dr', city: 'Cambridge', state: 'ON', zip: 'N3E 1A4', material: 'Card Stock', deliveries: 3 },
+  { name: 'Wallace Graphics', address: '2450 Meadowbrook Pkwy', city: 'Duluth', state: 'GA', zip: '30096', material: 'Non-Card Stock/Displays', deliveries: 23 },
+  { name: 'Archway-Midland', address: '2080 Commerce Dr', city: 'Midland', state: 'TX', zip: '79703', material: 'Card Stock', deliveries: 3 },
+  { name: 'CPS Cards', address: '80 Internationale Blvd, Unit C', city: 'Glendale Heights', state: 'IL', zip: '60139', material: 'Card Stock', deliveries: 9 },
+  { name: 'Magnetic Ticket & Label', address: '2911 Kraft Drive', city: 'Nashville', state: 'TN', zip: '37204', material: 'Card Stock', deliveries: 4 },
+  { name: 'MPS-Dallas/WestRock', address: '1455 Terre Colony Ct', city: 'Dallas', state: 'TX', zip: '75212', material: 'Card Stock', deliveries: 22 }
+];
+
+// ── App State ──
+let allData = [];           // [{custName, state, zip, lat, lng}]
+let customers = [];         // [{name, count, color, selected}]
+let customerMap = {};       // name → customer object
+let visibleData = [];       // filtered by selected customers
+
+let map, heatLayer, pinLayerGroup, clusterLayerGroup, regionLayerGroup, printerLayerGroup;
+let viewState = { pins: true, heat: true, cluster: false, region: false, printers: true };
+let activeRegionCard = null; // track which region card is expanded
+
+// ── Initialize Map ──
+function initMap() {
+  map = L.map('map', {
+    center: [39.5, -98.35],
+    zoom: 4,
+    minZoom: 2,
+    maxZoom: 18,
+    zoomControl: true,
+    preferCanvas: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
+  }).addTo(map);
+
+  heatLayer = L.heatLayer([], {
+    radius: 25, blur: 15, maxZoom: 10,
+    gradient: { 0.1: 'blue', 0.3: 'cyan', 0.5: 'lime', 0.7: 'yellow', 1.0: 'red' }
+  }).addTo(map);
+
+  pinLayerGroup = L.layerGroup().addTo(map);
+  clusterLayerGroup = L.layerGroup();
+  regionLayerGroup = L.layerGroup();
+  printerLayerGroup = L.layerGroup().addTo(map);
+}
+
+// ── Normalize State Codes ──
+function normalizeState(rawState) {
+  const code = (rawState || '').toString().toUpperCase().trim();
+  if (JUNK_STATES.has(code)) return { code: '', isCanadian: false };
+  if (KNOWN_STATE_FIXES[code]) return { code: KNOWN_STATE_FIXES[code], isCanadian: false };
+  if (CANADIAN_PROVINCES.has(code)) return { code, isCanadian: true };
+  return { code, isCanadian: false };
+}
+
+// ── Geocode from ZIP ──
+function geocodeRow(row) {
+  let zip = (row.zip || '').toString().replace(/\D/g, '');
+  if (zip.length >= 3) {
+    let z3 = zip.substring(0, 3);
+    let coords = ZIP3_COORDS[z3];
+    if (coords) {
+      // Add small jitter to prevent exact overlaps
+      return [coords[0] + (Math.random() - 0.5) * 0.15, coords[1] + (Math.random() - 0.5) * 0.15];
+    }
+  }
+  // Fallback to state
+  let state = (row.state || '').toUpperCase().trim();
+  if (STATE_COORDS[state]) {
+    let c = STATE_COORDS[state];
+    return [c[0] + (Math.random() - 0.5) * 0.5, c[1] + (Math.random() - 0.5) * 0.5];
+  }
+  // Fallback to Canadian province
+  if (PROVINCE_COORDS[state]) {
+    let c = PROVINCE_COORDS[state];
+    return [c[0] + (Math.random() - 0.5) * 0.5, c[1] + (Math.random() - 0.5) * 0.5];
+  }
+  return null;
+}
+
+// ── Parse File ──
+function parseFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  showLoading(10);
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      showLoading(30);
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      processRows(rows);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        showLoading(30);
+        processRows(results.data);
+      }
+    });
+  }
+}
+
+function normalizeHeader(h) {
+  let s = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (s.includes('custname') || s === 'customer' || s === 'customername') return 'custName';
+  if (s.includes('state') || s === 'shiptostate' || s === 'st') return 'state';
+  if (s.includes('zip') || s === 'shiptozip' || s === 'zipcode' || s === 'postal') return 'zip';
+  if (s.includes('addr') || s.includes('address') || s.includes('street')) return 'address';
+  return s;
+}
+
+function processRows(rows) {
+  showLoading(40);
+  if (!rows.length) return;
+
+  // Map headers
+  const sampleKeys = Object.keys(rows[0]);
+  const headerMap = {};
+  sampleKeys.forEach(k => { headerMap[k] = normalizeHeader(k); });
+
+  allData = [];
+  const custCounts = {};
+
+  // Process in chunks for UI responsiveness
+  const chunkSize = 5000;
+  let idx = 0;
+
+  function processChunk() {
+    const end = Math.min(idx + chunkSize, rows.length);
+    for (; idx < end; idx++) {
+      const row = rows[idx];
+      const mapped = {};
+      sampleKeys.forEach(k => { mapped[headerMap[k]] = row[k]; });
+
+      const custName = (mapped.custName || '').toString().trim();
+      if (!custName) continue;
+
+      const rawState = (mapped.state || '').toString().trim();
+      const zip = (mapped.zip || '').toString().trim();
+      const { code: state, isCanadian } = normalizeState(rawState);
+
+      if (!state && !zip) continue; // skip rows with no location
+
+      const coords = geocodeRow({ state, zip });
+      if (!coords) continue;
+
+      allData.push({
+        custName,
+        state,
+        zip,
+        lat: coords[0],
+        lng: coords[1],
+        address: mapped.address || '',
+        isCanadian
+      });
+
+      custCounts[custName] = (custCounts[custName] || 0) + 1;
+    }
+
+    showLoading(40 + (idx / rows.length) * 40);
+
+    if (idx < rows.length) {
+      setTimeout(processChunk, 0);
+    } else {
+      finishProcessing(custCounts);
+    }
+  }
+
+  processChunk();
+}
+
+function finishProcessing(custCounts) {
+  showLoading(85);
+
+  // Build customer list sorted by count desc
+  const sorted = Object.entries(custCounts).sort((a, b) => b[1] - a[1]);
+  customers = sorted.map(([name, count], i) => ({
+    name,
+    count,
+    color: COLORS[i % COLORS.length],
+    selected: true
+  }));
+  customerMap = {};
+  customers.forEach(c => customerMap[c.name] = c);
+
+  renderCustomerList();
+  updateVisibleData();
+  updateStats();
+
+  showLoading(100);
+  setTimeout(() => {
+    document.getElementById('fileOverlay').classList.remove('visible');
+    document.getElementById('loadingBar').style.display = 'none';
+    document.getElementById('mapLegend').style.display = 'block';
+    updateLegend();
+  }, 300);
+}
+
+// ── Customer List Rendering (virtual scroll for perf) ──
+let filteredCustomers = [];
+
+function renderCustomerList() {
+  filteredCustomers = customers;
+  renderFilteredList();
+}
+
+function renderFilteredList() {
+  const container = document.getElementById('customerList');
+  container.innerHTML = '';
+
+  // For large lists, render in batches
+  const fragment = document.createDocumentFragment();
+  filteredCustomers.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'customer-item' + (c.selected ? ' selected' : '');
+    div.innerHTML = `
+      <div class="color-dot" style="background:${c.color}"></div>
+      <div class="checkbox"></div>
+      <span class="cust-name" title="${c.name}">${c.name}</span>
+      <span class="cust-count">${c.count.toLocaleString()}</span>
+    `;
+    div.addEventListener('click', () => toggleCustomer(c));
+    fragment.appendChild(div);
+  });
+  container.appendChild(fragment);
+}
+
+function toggleCustomer(c) {
+  c.selected = !c.selected;
+  renderFilteredList();
+  scheduleUpdate();
+}
+
+let updateTimer = null;
+function scheduleUpdate() {
+  if (updateTimer) clearTimeout(updateTimer);
+  updateTimer = setTimeout(() => {
+    updateVisibleData();
+    updateStats();
+  }, 150);
+}
+
+// ── Update Visible Data & Map ──
+function updateVisibleData() {
+  const selectedSet = new Set(customers.filter(c => c.selected).map(c => c.name));
+  visibleData = allData.filter(d => selectedSet.has(d.custName));
+  updateMap();
+}
+
+function updateMap() {
+  updateHeatmap();
+  updatePins();
+  updateClusters();
+  updateRegions();
+  updatePrinters();
+}
+
+function updateHeatmap() {
+  if (!viewState.heat) {
+    map.removeLayer(heatLayer);
+    return;
+  }
+  if (!map.hasLayer(heatLayer)) map.addLayer(heatLayer);
+
+  const points = visibleData.map(d => [d.lat, d.lng, 0.5]);
+  heatLayer.setLatLngs(points);
+}
+
+function updatePins() {
+  pinLayerGroup.clearLayers();
+  if (!viewState.pins) {
+    if (map.hasLayer(pinLayerGroup)) map.removeLayer(pinLayerGroup);
+    return;
+  }
+  if (!map.hasLayer(pinLayerGroup)) map.addLayer(pinLayerGroup);
+
+  const size = parseInt(document.getElementById('pinSize').value);
+  const opacity = parseInt(document.getElementById('pinOpacity').value) / 10;
+
+  // For large datasets, sample if too many
+  let data = visibleData;
+  const MAX_PINS = 20000;
+  if (data.length > MAX_PINS) {
+    // Sample uniformly
+    const step = Math.ceil(data.length / MAX_PINS);
+    data = data.filter((_, i) => i % step === 0);
+  }
+
+  data.forEach(d => {
+    const c = customerMap[d.custName];
+    const color = c ? c.color : '#3b82f6';
+    const marker = L.circleMarker([d.lat, d.lng], {
+      radius: size / 2,
+      color: color,
+      fillColor: color,
+      fillOpacity: opacity,
+      weight: 1,
+      opacity: opacity
+    });
+    marker.bindPopup(`
+      <div style="min-width:160px">
+        <div style="font-weight:600;margin-bottom:4px;color:${color}">${d.custName}</div>
+        <div style="color:#8896b0;font-size:11px">
+          ${d.address ? d.address + '<br>' : ''}
+          ${d.state} ${d.zip}
+        </div>
+      </div>
+    `);
+    pinLayerGroup.addLayer(marker);
+  });
+}
+
+function updateClusters() {
+  clusterLayerGroup.clearLayers();
+  if (!viewState.cluster) {
+    if (map.hasLayer(clusterLayerGroup)) map.removeLayer(clusterLayerGroup);
+    return;
+  }
+  if (!map.hasLayer(clusterLayerGroup)) map.addLayer(clusterLayerGroup);
+
+  // Simple grid-based clustering
+  const zoom = map.getZoom();
+  const gridSize = Math.max(1, 8 - zoom) * 2;
+  const clusters = {};
+
+  visibleData.forEach(d => {
+    const gx = Math.floor(d.lat / gridSize);
+    const gy = Math.floor(d.lng / gridSize);
+    const key = `${gx},${gy}`;
+    if (!clusters[key]) clusters[key] = { lat: 0, lng: 0, count: 0 };
+    clusters[key].lat += d.lat;
+    clusters[key].lng += d.lng;
+    clusters[key].count++;
+  });
+
+  Object.values(clusters).forEach(c => {
+    const lat = c.lat / c.count;
+    const lng = c.lng / c.count;
+    const size = Math.min(50, 18 + Math.log2(c.count) * 5);
+    const color = c.count > 1000 ? '#ef4444' : c.count > 100 ? '#f59e0b' : c.count > 10 ? '#3b82f6' : '#22c55e';
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="cluster-marker" style="width:${size}px;height:${size}px;background:${color}">${c.count > 999 ? Math.round(c.count/1000)+'k' : c.count}</div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
+    });
+
+    L.marker([lat, lng], { icon }).addTo(clusterLayerGroup);
+  });
+}
+
+// ── Printer Layer ──
+function geocodePrinter(p) {
+  // ZIP3 lookup without jitter for stable printer positions
+  const zip = (p.zip || '').toString().replace(/\D/g, '').padStart(5, '0');
+  if (zip.length >= 3) {
+    const z3 = zip.substring(0, 3);
+    const coords = ZIP3_COORDS[z3];
+    if (coords) return coords;
+  }
+  // Province/state fallback
+  const state = (p.state || '').toUpperCase().trim();
+  if (PROVINCE_COORDS[state]) return PROVINCE_COORDS[state];
+  if (STATE_COORDS[state]) return STATE_COORDS[state];
+  return null;
+}
+
+function updatePrinters() {
+  printerLayerGroup.clearLayers();
+  if (!viewState.printers) {
+    if (map.hasLayer(printerLayerGroup)) map.removeLayer(printerLayerGroup);
+    return;
+  }
+  if (!map.hasLayer(printerLayerGroup)) map.addLayer(printerLayerGroup);
+
+  PRINTERS.forEach(p => {
+    const coords = geocodePrinter(p);
+    if (!coords) return;
+
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="printer-marker"><div class="printer-marker-inner"></div></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+
+    const marker = L.marker(coords, { icon, zIndexOffset: 1000 });
+    marker.bindPopup(`
+      <div style="min-width:200px">
+        <div style="font-weight:700;font-size:13px;color:#f97316;margin-bottom:6px">${p.name}</div>
+        <div style="color:#8896b0;font-size:11px;margin-bottom:4px">
+          ${p.address}<br>
+          ${p.city}, ${p.state} ${p.zip}
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid #243049">
+          <div>
+            <div style="font-size:10px;color:#5a6a84;text-transform:uppercase;letter-spacing:0.5px">Material</div>
+            <div style="font-size:12px;color:#e8edf5">${p.material}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#5a6a84;text-transform:uppercase;letter-spacing:0.5px">Deliveries (6mo)</div>
+            <div style="font-size:12px;font-weight:600;color:#f97316">${p.deliveries}</div>
+          </div>
+        </div>
+      </div>
+    `);
+    printerLayerGroup.addLayer(marker);
+  });
+}
+
+// ── Region View ──
+function updateRegions() {
+  regionLayerGroup.clearLayers();
+  const panel = document.getElementById('regionPanel');
+  const panelBody = document.getElementById('regionPanelBody');
+
+  if (!viewState.region) {
+    if (map.hasLayer(regionLayerGroup)) map.removeLayer(regionLayerGroup);
+    panel.classList.remove('visible');
+    return;
+  }
+  if (!map.hasLayer(regionLayerGroup)) map.addLayer(regionLayerGroup);
+  panel.classList.add('visible');
+
+  // Compute region stats from visible data
+  const regionStats = {};
+  Object.keys(US_REGIONS).forEach(r => {
+    regionStats[r] = { count: 0, states: {}, customers: {} };
+  });
+
+  visibleData.forEach(d => {
+    const st = (d.state || '').toUpperCase().trim();
+    const region = STATE_TO_REGION[st];
+    if (!region) return;
+    const rs = regionStats[region];
+    rs.count++;
+    rs.states[st] = (rs.states[st] || 0) + 1;
+    rs.customers[d.custName] = (rs.customers[d.custName] || 0) + 1;
+  });
+
+  const totalVisible = visibleData.length || 1;
+  const maxRegionCount = Math.max(1, ...Object.values(regionStats).map(r => r.count));
+
+  document.getElementById('regionTotalLabel').textContent = visibleData.length.toLocaleString() + ' shipments';
+
+  // Draw polygons on map and build data panel
+  panelBody.innerHTML = '';
+
+  // Sort regions by count descending
+  const sortedRegions = Object.entries(US_REGIONS).sort((a, b) => {
+    return (regionStats[b[0]]?.count || 0) - (regionStats[a[0]]?.count || 0);
+  });
+
+  sortedRegions.forEach(([regionName, regionDef]) => {
+    const stats = regionStats[regionName];
+    const pct = ((stats.count / totalVisible) * 100).toFixed(1);
+    const barPct = ((stats.count / maxRegionCount) * 100).toFixed(1);
+
+    // Draw polygon on map
+    if (regionDef.bounds && regionDef.bounds.length > 2 && regionName !== 'Territories') {
+      const polygon = L.polygon(regionDef.bounds, {
+        color: regionDef.color,
+        weight: 2.5,
+        opacity: 0.8,
+        fillColor: regionDef.color,
+        fillOpacity: 0.13,
+        smoothFactor: 1.5
+      });
+      polygon.addTo(regionLayerGroup);
+
+      // Region label on map
+      const label = L.divIcon({
+        className: 'region-map-label',
+        html: `<div class="region-label-inner">
+          <div class="region-label-name">${regionName.toUpperCase()}</div>
+          <div class="region-label-count">${stats.count.toLocaleString()}</div>
+          <div class="region-label-pct">${pct}%</div>
+        </div>`,
+        iconSize: [120, 50],
+        iconAnchor: [60, 25]
+      });
+      L.marker(regionDef.center, { icon: label, interactive: false }).addTo(regionLayerGroup);
+    }
+
+    // State breakdown sorted by count
+    const statesSorted = Object.entries(stats.states).sort((a, b) => b[1] - a[1]);
+    const maxStateCount = Math.max(1, ...(statesSorted.map(s => s[1])));
+    const statesHtml = statesSorted.map(([st, count]) => {
+      const stPct = ((count / maxStateCount) * 100).toFixed(0);
+      return `<div class="region-state-row">
+        <span class="rs-state">${st}</span>
+        <div class="rs-bar"><div class="rs-bar-fill" style="width:${stPct}%;background:${regionDef.color}"></div></div>
+        <span class="rs-count">${count.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+
+    // Top customers in this region
+    const topCusts = Object.entries(stats.customers).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const custHtml = topCusts.map(([name, count]) => {
+      return `<div class="rtc-row">
+        <span class="rtc-name" title="${name}">${name}</span>
+        <span class="rtc-count">${count.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+
+    const uniqueStates = statesSorted.length;
+    const uniqueCustomers = Object.keys(stats.customers).length;
+
+    // Build division breakdown
+    let divisionHtml = '';
+    if (regionDef.divisions) {
+      const divEntries = Object.entries(regionDef.divisions);
+      if (divEntries.length > 1) {
+        divisionHtml = '<div class="region-top-customers"><h5>Census Divisions</h5>';
+        divEntries.forEach(([divName, divStates]) => {
+          const divCount = divStates.reduce((sum, st) => sum + (stats.states[st] || 0), 0);
+          const divPctVal = stats.count > 0 ? ((divCount / stats.count) * 100).toFixed(1) : '0.0';
+          divisionHtml += `<div class="rtc-row"><span class="rtc-name">${divName}</span><span class="rtc-count">${divCount.toLocaleString()} (${divPctVal}%)</span></div>`;
+        });
+        divisionHtml += '</div>';
+      }
+    }
+
+    const card = document.createElement('div');
+    card.className = 'region-card' + (activeRegionCard === regionName ? ' active' : '');
+    card.innerHTML = `
+      <div class="region-card-top">
+        <div class="region-card-name">
+          <div class="region-swatch" style="background:${regionDef.color}"></div>
+          ${regionName}
+        </div>
+        <div class="region-card-count" style="color:${regionDef.color}">${stats.count.toLocaleString()}</div>
+      </div>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width:${barPct}%;background:${regionDef.color}"></div>
+      </div>
+      <div class="region-card-details">
+        <div class="region-detail"><span class="rd-val">${pct}%</span><span class="rd-label">of total</span></div>
+        <div class="region-detail"><span class="rd-val">${uniqueStates}</span><span class="rd-label">States</span></div>
+        <div class="region-detail"><span class="rd-val">${uniqueCustomers}</span><span class="rd-label">Customers</span></div>
+      </div>
+      <div class="region-card-expanded">
+        ${divisionHtml}
+        <div style="margin-top:6px">${statesHtml}</div>
+        ${custHtml ? `<div class="region-top-customers"><h5>Top Customers in Region</h5>${custHtml}</div>` : ''}
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      activeRegionCard = activeRegionCard === regionName ? null : regionName;
+      updateRegions(); // re-render to toggle expanded state
+    });
+    panelBody.appendChild(card);
+  });
+}
+
+// ── Stats ──
+function updateStats() {
+  const selectedCusts = customers.filter(c => c.selected);
+  const usStates = new Set();
+  const caProvinces = new Set();
+  visibleData.forEach(d => {
+    if (d.isCanadian) caProvinces.add(d.state);
+    else if (d.state) usStates.add(d.state);
+  });
+  const statesLabel = caProvinces.size > 0
+    ? `${usStates.size} + ${caProvinces.size} Prov`
+    : `${usStates.size}`;
+
+  document.getElementById('statTotal').textContent = allData.length.toLocaleString();
+  document.getElementById('statCustomers').textContent = customers.length.toLocaleString();
+  document.getElementById('statStates').textContent = statesLabel;
+  document.getElementById('statVisible').textContent = visibleData.length.toLocaleString();
+
+  // Summary panel
+  const top5 = selectedCusts.slice(0, 5);
+  let html = '';
+  top5.forEach(c => {
+    const vis = visibleData.filter(d => d.custName === c.name).length;
+    html += `<div class="ci-row"><span class="ci-label" style="color:${c.color}">${c.name.substring(0,20)}</span><span class="ci-val">${vis.toLocaleString()}</span></div>`;
+  });
+  if (selectedCusts.length > 5) {
+    html += `<div class="ci-row"><span class="ci-label">+ ${selectedCusts.length - 5} more</span></div>`;
+  }
+  if (!html) html = '<div class="ci-row"><span class="ci-label">No customers selected</span></div>';
+  document.getElementById('summaryInfo').innerHTML = html;
+}
+
+function updateLegend() {
+  const content = document.getElementById('legendContent');
+  let html = '';
+  if (viewState.heat) {
+    html += `
+      <div class="heatmap-gradient"></div>
+      <div class="gradient-labels"><span>Low</span><span>Med</span><span>High</span></div>
+    `;
+  } else {
+    const selected = customers.filter(c => c.selected).slice(0, 8);
+    html += selected.map(c =>
+      `<div class="legend-item"><div class="legend-color" style="background:${c.color}"></div>${c.name.substring(0,20)}</div>`
+    ).join('');
+  }
+  if (viewState.printers) {
+    html += `<div class="legend-item" style="margin-top:6px"><div class="legend-color" style="background:#f97316;transform:rotate(45deg);border-radius:1px;width:10px;height:10px"></div>Printer / Supplier</div>`;
+  }
+  content.innerHTML = html;
+}
+
+// ── Loading ──
+function showLoading(pct) {
+  const bar = document.getElementById('loadingBar');
+  bar.style.display = 'block';
+  bar.style.width = pct + '%';
+}
+
+// ── Event Listeners ──
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  updatePrinters();
+  // Show legend immediately for printer layer
+  document.getElementById('mapLegend').style.display = 'block';
+  updateLegend();
+
+  // File input
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) parseFile(e.target.files[0]);
+  });
+
+  document.getElementById('btnLoadFile').addEventListener('click', () => {
+    document.getElementById('fileOverlay').classList.add('visible');
+  });
+
+  // Drag & drop
+  const overlay = document.getElementById('fileOverlay');
+  const card = document.getElementById('uploadCard');
+  document.body.addEventListener('dragover', e => { e.preventDefault(); overlay.classList.add('visible'); card.classList.add('dragover'); });
+  document.body.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedTarget === document.documentElement) card.classList.remove('dragover'); });
+  document.body.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]);
+  });
+
+  // View toggles (top buttons)
+  ['btnViewPins', 'btnViewHeat', 'btnViewCluster', 'btnViewRegion', 'btnViewPrinters'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function() {
+      const view = this.dataset.view;
+      viewState[view] = !viewState[view];
+      this.classList.toggle('active', viewState[view]);
+      // Sync toggle switches
+      const toggle = document.getElementById('toggle' + view.charAt(0).toUpperCase() + view.slice(1));
+      if (toggle) toggle.classList.toggle('on', viewState[view]);
+      updateMap();
+      updateLegend();
+    });
+  });
+
+  // Toggle switches in right panel
+  document.querySelectorAll('.view-option').forEach(opt => {
+    opt.addEventListener('click', function() {
+      const layer = this.dataset.layer;
+      viewState[layer] = !viewState[layer];
+      this.querySelector('.toggle').classList.toggle('on', viewState[layer]);
+      // Sync top buttons
+      const btn = document.getElementById('btnView' + layer.charAt(0).toUpperCase() + layer.slice(1));
+      if (btn) btn.classList.toggle('active', viewState[layer]);
+      updateMap();
+      updateLegend();
+    });
+  });
+
+  // Heatmap sliders
+  document.getElementById('heatRadius').addEventListener('input', function() {
+    document.getElementById('heatRadiusVal').textContent = this.value;
+    heatLayer.setOptions({ radius: parseInt(this.value) });
+    heatLayer.redraw();
+  });
+  document.getElementById('heatIntensity').addEventListener('input', function() {
+    const v = this.value / 10;
+    document.getElementById('heatIntensityVal').textContent = v.toFixed(1);
+    // Re-set with intensity
+    const points = visibleData.map(d => [d.lat, d.lng, v]);
+    heatLayer.setLatLngs(points);
+  });
+  document.getElementById('heatBlur').addEventListener('input', function() {
+    document.getElementById('heatBlurVal').textContent = this.value;
+    heatLayer.setOptions({ blur: parseInt(this.value) });
+    heatLayer.redraw();
+  });
+
+  // Pin sliders
+  document.getElementById('pinSize').addEventListener('input', function() {
+    document.getElementById('pinSizeVal').textContent = this.value;
+    updatePins();
+  });
+  document.getElementById('pinOpacity').addEventListener('input', function() {
+    document.getElementById('pinOpacityVal').textContent = (this.value / 10).toFixed(1);
+    updatePins();
+  });
+
+  // Customer search
+  document.getElementById('customerSearch').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    filteredCustomers = q ? customers.filter(c => c.name.toLowerCase().includes(q)) : customers;
+    renderFilteredList();
+  });
+
+  // Select all / deselect / invert
+  document.getElementById('btnSelectAll').addEventListener('click', () => {
+    filteredCustomers.forEach(c => c.selected = true);
+    renderFilteredList();
+    scheduleUpdate();
+  });
+  document.getElementById('btnDeselectAll').addEventListener('click', () => {
+    filteredCustomers.forEach(c => c.selected = false);
+    renderFilteredList();
+    scheduleUpdate();
+  });
+  document.getElementById('btnInvert').addEventListener('click', () => {
+    filteredCustomers.forEach(c => c.selected = !c.selected);
+    renderFilteredList();
+    scheduleUpdate();
+  });
+
+  // Sidebar toggles
+  document.getElementById('btnToggleSidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+    setTimeout(() => map.invalidateSize(), 250);
+  });
+  document.getElementById('btnToggleRight').addEventListener('click', () => {
+    document.getElementById('rightPanel').classList.toggle('collapsed');
+    setTimeout(() => map.invalidateSize(), 250);
+  });
+
+  // Re-cluster on zoom
+  map.on('zoomend', () => {
+    if (viewState.cluster) updateClusters();
+  });
+});
+</script>
+</body>
+</html>
