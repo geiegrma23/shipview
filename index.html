@@ -411,6 +411,40 @@ body {
 .file-input-label:hover { background: #2563eb; }
 #fileInput { display: none; }
 
+.upload-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.upload-divider::before, .upload-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.db-load-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: 'DM Sans', sans-serif;
+  margin-bottom: 12px;
+}
+.db-load-btn:hover { background: #16a34a; }
+.db-load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* Loading */
 .loading-bar {
   position: absolute;
@@ -978,6 +1012,12 @@ body {
     </label>
     <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.xlsx,.xls">
     <p class="formats">Supports: .csv, .tsv, .xlsx, .xls — up to several hundred thousand rows</p>
+    <div class="upload-divider">or</div>
+    <button class="db-load-btn" id="btnLoadDB">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Load from Database
+    </button>
+    <p class="formats" id="dbStatus"></p>
   </div>
 </div>
 
@@ -1521,6 +1561,67 @@ const STATE_TO_REGION = {};
 Object.entries(US_REGIONS).forEach(([regionName, regionData]) => {
   regionData.states.forEach(st => { STATE_TO_REGION[st] = regionName; });
 });
+
+// ── API Configuration ──
+const API_BASE = 'https://api.ksp3plhq.com';
+const API_KEY = ''; // Set this if you enabled API key auth
+
+async function loadFromDatabase() {
+  const btn = document.getElementById('btnLoadDB');
+  const status = document.getElementById('dbStatus');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  status.textContent = 'Connecting to database...';
+  showLoading(10);
+
+  try {
+    let allRows = [];
+    let offset = 0;
+    const limit = 10000;
+    let total = Infinity;
+
+    while (offset < total) {
+      status.textContent = `Fetching records ${offset.toLocaleString()}...`;
+      showLoading(10 + (offset / Math.max(total, 1)) * 30);
+
+      const headers = {};
+      if (API_KEY) headers['X-API-Key'] = API_KEY;
+
+      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}`, { headers });
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+
+      const json = await res.json();
+      total = json.total;
+      allRows = allRows.concat(json.data);
+      offset += limit;
+
+      if (json.data.length === 0) break;
+    }
+
+    status.textContent = `Processing ${allRows.length.toLocaleString()} records...`;
+    showLoading(40);
+
+    // Convert API response to the format processRows expects
+    const rows = allRows.map(r => ({
+      'Cust Name': r.cust_name || '',
+      'Ship to State': r.ship_to_state || '',
+      'Ship to Zip': r.ship_to_zip || '',
+      'Ship to City': r.ship_to_city || '',
+      'Ship Date': r.ship_date || '',
+      'Order Status': r.order_status || '',
+      'Carrier': r.carrier || '',
+      'Order Qty': r.order_qty || ''
+    }));
+
+    processRows(rows);
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    showLoading(0);
+    document.getElementById('loadingBar').style.display = 'none';
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Load from Database';
+  }
+}
 
 // Customer color palette
 const COLORS = [
@@ -2183,6 +2284,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnLoadFile').addEventListener('click', () => {
     document.getElementById('fileOverlay').classList.add('visible');
   });
+
+  // Load from database button
+  document.getElementById('btnLoadDB').addEventListener('click', loadFromDatabase);
 
   // Drag & drop
   const overlay = document.getElementById('fileOverlay');
