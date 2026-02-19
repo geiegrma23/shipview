@@ -129,9 +129,9 @@ app.get('/api/orders',async (req, res) => {
 // Get distinct values for filters
 app.get('/api/filters',async (req, res) => {
   try {
-    const [statuses] = await pool.query('SELECT DISTINCT `Order_Status` AS value FROM `Order Query` WHERE `Order_Status` IS NOT NULL ORDER BY `Order_Status`');
-    const [units] = await pool.query('SELECT DISTINCT `Business Unit` AS value FROM `Order Query` WHERE `Business Unit` IS NOT NULL ORDER BY `Business Unit`');
-    const [carriers] = await pool.query('SELECT DISTINCT `Carrier` AS value FROM `Order Query` WHERE `Carrier` IS NOT NULL ORDER BY `Carrier`');
+    const [statuses] = await pool.query('SELECT DISTINCT `Order_Status` AS value FROM `Order_Query` WHERE `Order_Status` IS NOT NULL ORDER BY `Order_Status`');
+    const [units] = await pool.query('SELECT DISTINCT `Business Unit` AS value FROM `Order_Query` WHERE `Business Unit` IS NOT NULL ORDER BY `Business Unit`');
+    const [carriers] = await pool.query('SELECT DISTINCT `Carrier` AS value FROM `Order_Query` WHERE `Carrier` IS NOT NULL ORDER BY `Carrier`');
 
     res.json({
       statuses: statuses.map(r => r.value),
