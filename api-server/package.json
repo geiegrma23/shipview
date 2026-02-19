@@ -1,0 +1,15 @@
+{
+  "name": "shipview-api",
+  "version": "1.0.0",
+  "description": "ShipView API - serves order data from MySQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "mysql2": "^3.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0"
+  }
+}
