@@ -23,15 +23,8 @@ app.use(cors({
   }
 }));
 
-// API key middleware
-function requireApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key'];
-  if (!process.env.API_KEY || apiKey === process.env.API_KEY) {
-    next();
-  } else {
-    res.status(401).json({ error: 'Unauthorized' });
-  }
-}
+// Auth is handled by Cloudflare Access at the network level.
+// No API key middleware needed.
 
 // MySQL connection pool
 const pool = mysql.createPool({
@@ -56,7 +49,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Get orders for ShipView map
-app.get('/api/orders', requireApiKey, async (req, res) => {
+app.get('/api/orders',async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 10000, 50000);
     const offset = parseInt(req.query.offset) || 0;
@@ -134,7 +127,7 @@ app.get('/api/orders', requireApiKey, async (req, res) => {
 });
 
 // Get distinct values for filters
-app.get('/api/filters', requireApiKey, async (req, res) => {
+app.get('/api/filters',async (req, res) => {
   try {
     const [statuses] = await pool.query('SELECT DISTINCT `Order_Status` AS value FROM `Order Query` WHERE `Order_Status` IS NOT NULL ORDER BY `Order_Status`');
     const [units] = await pool.query('SELECT DISTINCT `Business Unit` AS value FROM `Order Query` WHERE `Business Unit` IS NOT NULL ORDER BY `Business Unit`');

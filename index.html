@@ -1564,7 +1564,6 @@ Object.entries(US_REGIONS).forEach(([regionName, regionData]) => {
 
 // ── API Configuration ──
 const API_BASE = 'https://api.ksp3plhq.com';
-const API_KEY = ''; // Set this if you enabled API key auth
 
 async function loadFromDatabase() {
   const btn = document.getElementById('btnLoadDB');
@@ -1584,10 +1583,7 @@ async function loadFromDatabase() {
       status.textContent = `Fetching records ${offset.toLocaleString()}...`;
       showLoading(10 + (offset / Math.max(total, 1)) * 30);
 
-      const headers = {};
-      if (API_KEY) headers['X-API-Key'] = API_KEY;
-
-      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}`, { headers });
+      const res = await fetch(`${API_BASE}/api/orders?limit=${limit}&offset=${offset}`);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
 
       const json = await res.json();
