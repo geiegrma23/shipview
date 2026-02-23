@@ -77,6 +77,29 @@ body {
   gap: 8px;
 }
 
+.topbar-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-date-range input[type="date"] {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  height: 32px;
+}
+.topbar-date-range input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+.topbar-date-range .date-sep {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .topbar-stats {
   display: flex;
   gap: 20px;
@@ -388,92 +411,9 @@ body {
   max-width: 520px;
   transition: border-color 0.2s;
 }
-.upload-card.dragover { border-color: var(--accent); }
 .upload-card svg { width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 16px; }
 .upload-card h2 { font-size: 20px; margin-bottom: 8px; font-weight: 600; }
-.upload-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; }
-.upload-card .formats { font-size: 11px; color: var(--text-muted); }
-
-.file-input-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin-bottom: 12px;
-}
-.file-input-label:hover { background: #2563eb; }
-#fileInput { display: none; }
-
-.upload-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.upload-divider::before, .upload-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.db-load-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  background: var(--green);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: 'DM Sans', sans-serif;
-  margin-bottom: 12px;
-}
-.db-load-btn:hover { background: #16a34a; }
-.db-load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.db-date-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-.db-date-row label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.db-date-row input[type="date"] {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  padding: 6px 10px;
-  font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.db-date-row input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
-}
-.db-record-count {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  margin-bottom: 8px;
-}
+.upload-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
 
 /* Loading */
 .loading-bar {
@@ -887,15 +827,20 @@ body {
     <div class="stat-item"><span class="stat-val" id="statVisible">—</span><span class="stat-label">Visible</span></div>
   </div>
   <div class="topbar-actions">
+    <div class="topbar-date-range">
+      <input type="date" id="dbDateFrom" title="From date">
+      <span class="date-sep">—</span>
+      <input type="date" id="dbDateTo" title="To date">
+      <button class="btn btn-accent" id="btnLoadDB" title="Load data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span id="dbLoadLabel">Load</span>
+      </button>
+    </div>
     <button class="btn" id="btnToggleSidebar" title="Toggle customer list">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M9 3v18"/></svg>
     </button>
     <button class="btn" id="btnToggleRight" title="Toggle settings panel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-9.7-6.3l2.8-2.8m11.4-2.8l2.8-2.8M1 12h4m14 0h4M4.2 4.2l2.8 2.8m9.9 9.9l2.8 2.8"/></svg>
-    </button>
-    <button class="btn btn-accent" id="btnLoadFile">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Load Data
     </button>
   </div>
 </div>
@@ -1030,36 +975,15 @@ body {
   </div>
 </div>
 
-<!-- File upload overlay -->
-<div class="file-overlay visible" id="fileOverlay">
-  <div class="upload-card" id="uploadCard">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-    <h2>Load Shipping Data</h2>
-    <p>Upload a CSV, TSV, or Excel file with columns for<br><strong>Cust Name</strong>, <strong>Ship to State</strong>, and <strong>Ship to Zip</strong></p>
-    <label class="file-input-label" for="fileInput">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Choose File
-    </label>
-    <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.xlsx,.xls">
-    <p class="formats">Supports: .csv, .tsv, .xlsx, .xls — up to several hundred thousand rows</p>
-    <div class="upload-divider">or</div>
-    <div class="db-date-row">
-      <label>From</label>
-      <input type="date" id="dbDateFrom">
-      <label>To</label>
-      <input type="date" id="dbDateTo">
-    </div>
-    <div class="db-record-count" id="dbRecordCount"></div>
-    <button class="db-load-btn" id="btnLoadDB">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-      Load from Database
-    </button>
-    <p class="formats" id="dbStatus"></p>
+<!-- Loading overlay -->
+<div class="file-overlay" id="loadingOverlay">
+  <div class="upload-card">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    <h2 id="loadingTitle">Loading ShipView...</h2>
+    <p id="loadingStatus">Connecting to database...</p>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
 // ── ZIP → lat/lng lookup: precomputed centroids for US ZIP3 prefixes ──
@@ -1608,45 +1532,24 @@ function initDatePickers() {
   const thirtyAgo = new Date(today);
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
 
-  const toStr = today.toISOString().split('T')[0];
-  const fromStr = thirtyAgo.toISOString().split('T')[0];
-
-  document.getElementById('dbDateTo').value = toStr;
-  document.getElementById('dbDateFrom').value = fromStr;
-
-  // Preview record count when dates change
-  document.getElementById('dbDateFrom').addEventListener('change', previewRecordCount);
-  document.getElementById('dbDateTo').addEventListener('change', previewRecordCount);
-  previewRecordCount();
-}
-
-async function previewRecordCount() {
-  const from = document.getElementById('dbDateFrom').value;
-  const to = document.getElementById('dbDateTo').value;
-  const countEl = document.getElementById('dbRecordCount');
-
-  if (!from || !to) { countEl.textContent = ''; return; }
-
-  countEl.textContent = 'Counting...';
-  try {
-    const res = await fetch(`${API_BASE}/api/orders/aggregated?from_date=${from}&to_date=${to}`);
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    countEl.textContent = `${json.total.toLocaleString()} orders (${json.aggregated_rows.toLocaleString()} groups)`;
-  } catch {
-    countEl.textContent = '';
-  }
+  document.getElementById('dbDateTo').value = today.toISOString().split('T')[0];
+  document.getElementById('dbDateFrom').value = thirtyAgo.toISOString().split('T')[0];
 }
 
 async function loadFromDatabase() {
   const btn = document.getElementById('btnLoadDB');
-  const status = document.getElementById('dbStatus');
+  const label = document.getElementById('dbLoadLabel');
+  const overlay = document.getElementById('loadingOverlay');
+  const loadingTitle = document.getElementById('loadingTitle');
+  const loadingStatus = document.getElementById('loadingStatus');
   const fromDate = document.getElementById('dbDateFrom').value;
   const toDate = document.getElementById('dbDateTo').value;
 
   btn.disabled = true;
-  btn.textContent = 'Loading...';
-  status.textContent = 'Fetching aggregated data...';
+  label.textContent = 'Loading...';
+  overlay.classList.add('visible');
+  loadingTitle.textContent = 'Loading ShipView...';
+  loadingStatus.textContent = 'Fetching data from database...';
   showLoading(20);
 
   try {
@@ -1656,7 +1559,7 @@ async function loadFromDatabase() {
     if (!res.ok) throw new Error(`API returned ${res.status}`);
 
     const json = await res.json();
-    status.textContent = `Processing ${json.total.toLocaleString()} orders (${json.aggregated_rows.toLocaleString()} groups)...`;
+    loadingStatus.textContent = `Processing ${json.total.toLocaleString()} orders...`;
     showLoading(50);
 
     // Expand aggregated rows: each row has a count, create that many entries
@@ -1666,7 +1569,7 @@ async function loadFromDatabase() {
       const row = {
         'Cust Name': r.cust_name || '',
         'Ship to State': r.ship_to_state || '',
-        'Ship to Zip': (r.zip3 || '') + '00'  // pad ZIP3 back to 5 digits for geocoding
+        'Ship to Zip': (r.zip3 || '') + '00'
       };
       for (let i = 0; i < r.count; i++) {
         rows.push(row);
@@ -1675,11 +1578,12 @@ async function loadFromDatabase() {
 
     processRows(rows);
   } catch (err) {
-    status.textContent = 'Error: ' + err.message;
+    loadingStatus.textContent = 'Error: ' + err.message;
     showLoading(0);
     document.getElementById('loadingBar').style.display = 'none';
+  } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Load from Database';
+    label.textContent = 'Load';
   }
 }
 
@@ -1904,7 +1808,7 @@ function finishProcessing(custCounts) {
 
   showLoading(100);
   setTimeout(() => {
-    document.getElementById('fileOverlay').classList.remove('visible');
+    document.getElementById('loadingOverlay').classList.remove('visible');
     document.getElementById('loadingBar').style.display = 'none';
     document.getElementById('mapLegend').style.display = 'block';
     updateLegend();
@@ -2337,28 +2241,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('mapLegend').style.display = 'block';
   updateLegend();
 
-  // File input
-  document.getElementById('fileInput').addEventListener('change', e => {
-    if (e.target.files[0]) parseFile(e.target.files[0]);
-  });
-
-  document.getElementById('btnLoadFile').addEventListener('click', () => {
-    document.getElementById('fileOverlay').classList.add('visible');
-  });
-
-  // Load from database button
+  // Load from database button + auto-load
   document.getElementById('btnLoadDB').addEventListener('click', loadFromDatabase);
-
-  // Drag & drop
-  const overlay = document.getElementById('fileOverlay');
-  const card = document.getElementById('uploadCard');
-  document.body.addEventListener('dragover', e => { e.preventDefault(); overlay.classList.add('visible'); card.classList.add('dragover'); });
-  document.body.addEventListener('dragleave', e => { if (!e.relatedTarget || e.relatedTarget === document.documentElement) card.classList.remove('dragover'); });
-  document.body.addEventListener('drop', e => {
-    e.preventDefault();
-    card.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]);
-  });
+  loadFromDatabase(); // auto-load on page open
 
   // View toggles (top buttons)
   ['btnViewPins', 'btnViewHeat', 'btnViewCluster', 'btnViewRegion', 'btnViewPrinters'].forEach(id => {
